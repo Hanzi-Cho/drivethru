@@ -1,9 +1,8 @@
 # DriveThru IVI - 차량 UI 드라이브스루 주문 시스템
 
 > Android Automotive OS 포트폴리오 프로젝트 기획서
-> 개발자: 조한지 (Hanzi-Cho)
-> 목적: 현대차 IVI 직무 신입 채용 포트폴리오
-> 총 기간: 약 12주
+> 개발자: 조재현 (Hanzi-Cho)
+> 목적: IVI 도메인 학습
 
 ---
 
@@ -27,11 +26,7 @@
 
 ### 1.3 범위 설정 원칙
 
-이 프로젝트의 목적은 IVI 도메인 이해 수준을 증명하는 것입니다. 결제 완성, 실제 POS 연동, 상용 수준의 백엔드는 의도적으로 제외합니다.
-
-면접 답변 예시:
-
-> "확장 가능한 구조로 설계했으며, 이번 버전은 AAOS 플랫폼 레이어 학습에 집중했습니다."
+이 프로젝트의 목적은 IVI 도메인을 학습하는 것입니다. 결제 완성, 실제 POS 연동, 상용 수준의 백엔드는 의도적으로 제외합니다.
 
 ---
 
@@ -395,4 +390,4 @@ setValue(VehicleProperty::GEAR_SELECTION, gearValue);
 
 ---
 
-*DriveThru IVI - Hanzi-Cho | 현대차 IVI 직무 포트폴리오*
+*DriveThru IVI - Hanzi-Cho*
