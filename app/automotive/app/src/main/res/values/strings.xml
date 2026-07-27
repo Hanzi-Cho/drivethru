@@ -1,28 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">DriveThru IVI</string>
-    <string name="waiting_title">Drive-thru standby</string>
-    <string name="waiting_message">Waiting for a store entry event. For now, use the demo action to confirm the first in-car flow.</string>
-    <string name="enter_demo_store">Enter demo store</string>
-    <string name="debug_drive">Set DRIVE</string>
-    <string name="debug_park">Set PARK</string>
-    <string name="debug_section_title">Debug state</string>
-    <string name="debug_current_gear">Current gear: %1$s</string>
-    <string name="simplified_menu_gear_hint">Non-PARK states stay on the distraction-safe quick order view.</string>
-    <string name="full_menu_gear_hint">PARK unlocks the full browseable menu for the current store.</string>
-    <string name="default_store_name">DriveThru Demo</string>
-    <string name="simplified_menu_title">%1$s quick order</string>
-    <string name="quick_order_section_title">One-tap menu</string>
-    <string name="menu_item_price_description">%1$s KRW · %2$s</string>
-    <string name="full_menu_title">%1$s full menu</string>
-    <string name="full_menu_burger_section">Burgers</string>
-    <string name="full_menu_drink_section">Drinks</string>
-    <string name="order_review_title">%1$s order review</string>
-    <string name="order_review_missing_title">Order review unavailable</string>
-    <string name="order_review_items_section">Selected items</string>
-    <string name="order_review_summary_section">Summary</string>
-    <string name="order_review_item_title">%1$s x%2$s</string>
-    <string name="order_review_item_price">%1$s KRW</string>
-    <string name="order_review_total">Total: %1$s KRW</string>
-    <string name="order_review_status">Ready for the next submission step</string>
+    <string name="destination_menu">Menu</string>
+    <string name="destination_cart">Cart</string>
+    <string name="destination_order">Order</string>
+    <string name="destination_setting">Setting</string>
+    <string name="section_vehicle">Vehicle status</string>
+    <string name="section_order_summary">Order summary</string>
+    <string name="menu_category_hint">Tap an item below to add it to cart.</string>
+    <string name="action_add">ADD</string>
+    <string name="menu_summary_title">Cart total %1$s</string>
+    <string name="menu_summary_subtitle">%1$s items selected</string>
+    <string name="cart_pay_now">Pay now</string>
+    <string name="cart_back_to_menu">Back to menu</string>
+    <string name="cart_total_row">Total %1$s</string>
+    <string name="cart_summary_details">Subtotal %1$s · Discount %2$s</string>
+    <string name="order_empty_message">No completed order yet. Open Cart to review or place the first order.</string>
+    <string name="order_go_to_cart">Open cart</string>
+    <string name="order_complete_title">Payment complete</string>
+    <string name="order_payment_title">Paid %1$s</string>
+    <string name="order_back_to_menu">Back to menu</string>
 </resources>

@@ -1,78 +1,119 @@
 package com.hanzi.drivethru.core.state
 
-import com.hanzi.drivethru.core.model.DriveThruState
-import com.hanzi.drivethru.core.model.GearState
-import com.hanzi.drivethru.core.model.OrderDraft
-import com.hanzi.drivethru.core.model.OrderLineItem
+import com.hanzi.drivethru.core.model.AppDestination
+import com.hanzi.drivethru.core.model.CartLineItem
+import com.hanzi.drivethru.core.model.CartSummary
+import com.hanzi.drivethru.core.model.GlobalStatus
+import com.hanzi.drivethru.core.model.MenuSection
+import com.hanzi.drivethru.core.model.OrderReceipt
+import com.hanzi.drivethru.core.model.PaymentMethod
+import com.hanzi.drivethru.core.model.SettingEntry
 import com.hanzi.drivethru.data.menu.MenuRepository
-import com.hanzi.drivethru.data.vehicle.GearStateDataSource
+import com.hanzi.drivethru.data.payment.PaymentMethodRepository
+import com.hanzi.drivethru.data.settings.SettingsRepository
+import com.hanzi.drivethru.data.status.StatusRepository
 
 class DriveThruStateStore(
-    private val gearStateDataSource: GearStateDataSource,
     private val menuRepository: MenuRepository,
+    private val paymentMethodRepository: PaymentMethodRepository,
+    private val settingsRepository: SettingsRepository,
+    private val statusRepository: StatusRepository,
 ) {
-    private val demoStoreName = "Demo Drive-Thru"
+    private val cartQuantities = linkedMapOf<String, Int>()
+    private val cartOptions = mutableMapOf<String, List<String>>()
 
-    var currentState: DriveThruState = DriveThruState.WaitingForEntry
+    var activeDestination: AppDestination = AppDestination.MENU
         private set
 
-    val currentGearState: GearState
-        get() = gearStateDataSource.getCurrentGearState()
+    private var latestOrderReceipt: OrderReceipt? = null
 
-    fun enterDemoStore() {
-        currentState = createMenuState(currentGearState)
-    }
-
-    fun updateGearState(gearState: GearState) {
-        gearStateDataSource.updateGearState(gearState)
-        currentState = when (val state = currentState) {
-            DriveThruState.WaitingForEntry -> DriveThruState.WaitingForEntry
-            is DriveThruState.SimplifiedMenu -> createMenuState(gearState, state.storeName)
-            is DriveThruState.FullMenu -> createMenuState(gearState, state.storeName)
-            is DriveThruState.ReviewingOrder -> state
+    init {
+        menuRepository.getSeededCart().forEach { seed ->
+            cartQuantities[seed.menuItemId] = seed.quantity
+            cartOptions[seed.menuItemId] = seed.selectedOptions
         }
     }
 
-    fun shouldShowFullMenu(): Boolean = currentGearState == GearState.PARK
-
-    fun getQuickOrderMenu(storeName: String): List<com.hanzi.drivethru.core.model.MenuItem> {
-        return menuRepository.getQuickOrderMenu(storeName)
+    fun selectDestination(destination: AppDestination) {
+        activeDestination = destination
     }
 
-    fun getFullMenu(storeName: String): List<com.hanzi.drivethru.core.model.MenuItem> {
-        return menuRepository.getFullMenu(storeName)
+    fun getGlobalStatus(): GlobalStatus = statusRepository.getStatus()
+
+    fun getMenuSections(): List<MenuSection> = menuRepository.getMenuSections()
+
+    fun addMenuItem(itemId: String) {
+        if (menuRepository.findMenuItemById(itemId) == null) {
+            return
+        }
+        cartQuantities[itemId] = (cartQuantities[itemId] ?: 0) + 1
+        if (!cartOptions.containsKey(itemId)) {
+            cartOptions[itemId] = listOf("Standard")
+        }
     }
 
-    fun selectMenuItem(storeName: String, itemId: String): Boolean {
-        val menuItem = menuRepository.findMenuItemById(storeName, itemId) ?: return false
-        currentState = DriveThruState.ReviewingOrder(
-            orderDraft = OrderDraft(
-                storeName = storeName,
-                items = listOf(
-                    OrderLineItem(
-                        menuItem = menuItem,
-                        quantity = 1,
-                    ),
-                ),
-            ),
-        )
-        return true
+    fun getCartItems(): List<CartLineItem> {
+        return cartQuantities
+            .mapNotNull { (itemId, quantity) ->
+                val menuItem = menuRepository.findMenuItemById(itemId) ?: return@mapNotNull null
+                CartLineItem(
+                    menuItem = menuItem,
+                    quantity = quantity,
+                    selectedOptions = cartOptions[itemId].orEmpty(),
+                )
+            }
     }
 
-    private fun createMenuState(
-        gearState: GearState,
-        storeName: String = demoStoreName,
-    ): DriveThruState {
-        return if (gearState == GearState.PARK) {
-            DriveThruState.FullMenu(
-                storeName = storeName,
-                gearState = gearState,
-            )
+    fun incrementCartItem(itemId: String) {
+        addMenuItem(itemId)
+    }
+
+    fun decrementCartItem(itemId: String) {
+        val current = cartQuantities[itemId] ?: return
+        if (current <= 1) {
+            removeCartItem(itemId)
         } else {
-            DriveThruState.SimplifiedMenu(
-                storeName = storeName,
-                gearState = gearState,
-            )
+            cartQuantities[itemId] = current - 1
         }
     }
+
+    fun removeCartItem(itemId: String) {
+        cartQuantities.remove(itemId)
+        cartOptions.remove(itemId)
+    }
+
+    fun getCartSummary(): CartSummary {
+        val items = getCartItems()
+        val subtotal = items.sumOf { it.totalPrice }
+        return CartSummary(
+            subtotal = subtotal,
+            discount = 0,
+            total = subtotal,
+            itemCount = items.sumOf { it.quantity },
+        )
+    }
+
+    fun getDefaultPaymentMethod(): PaymentMethod = paymentMethodRepository.getDefaultPaymentMethod()
+
+    fun submitOrder() {
+        val cartItems = getCartItems()
+        if (cartItems.isEmpty()) {
+            return
+        }
+
+        val summary = getCartSummary()
+        latestOrderReceipt = OrderReceipt(
+            orderId = "DT-${System.currentTimeMillis().toString().takeLast(6)}",
+            storeName = "Drive-Thru Service",
+            items = cartItems,
+            paymentMethod = getDefaultPaymentMethod(),
+            totalAmount = summary.total,
+            pickupMessage = "Move forward to the pickup zone.",
+        )
+        activeDestination = AppDestination.ORDER
+    }
+
+    fun getLatestOrderReceipt(): OrderReceipt? = latestOrderReceipt
+
+    fun getSettings(): List<SettingEntry> = settingsRepository.getSettings()
 }

@@ -5,18 +5,11 @@ import androidx.car.app.CarAppService
 import androidx.car.app.Session
 import androidx.car.app.SessionInfo
 import androidx.car.app.validation.HostValidator
-import com.hanzi.drivethru.data.menu.FakeMenuRepository
-import com.hanzi.drivethru.data.vehicle.FakeGearStateDataSource
-import com.hanzi.drivethru.core.state.DriveThruStateStore
+import com.hanzi.drivethru.di.AppContainer
 
 class DriveThruCarAppService : CarAppService() {
     override fun onCreateSession(sessionInfo: SessionInfo): Session {
-        return DriveThruSession(
-            DriveThruStateStore(
-                gearStateDataSource = FakeGearStateDataSource(),
-                menuRepository = FakeMenuRepository(),
-            ),
-        )
+        return DriveThruSession(AppContainer().stateStore)
     }
 
     override fun createHostValidator(): HostValidator {
