@@ -250,6 +250,37 @@ GPS/geofence proximity detected
 - 일반 서드파티 앱 관점에서는 자동 Activity 전면 실행은 OEM 정책에 크게 좌우된다.
 - 본 프로젝트는 최종적으로 OEM-style custom UI 시나리오를 목표로 문서화한다.
 
+## 6.2 플랫폼 확장 경로
+
+현재 문서의 기본 축은 `앱 아키텍처`지만, 장기적으로는 아래 시스템 경로까지 확장할 수 있어야 한다.
+
+```text
+DriveThru App
+  -> DriveThruManager or CarPropertyManager
+  -> DriveThruService / Car Service
+  -> Vehicle HAL
+  -> Fake Vehicle Hardware
+  -> ECU / CAN Simulator
+```
+
+이 경로로 확장하면 다음을 보여줄 수 있다.
+
+- 앱 개발
+- Binder IPC
+- Framework API 설계
+- 시스템 서비스 수정
+- 차량 신호 모델링
+- VHAL 이벤트 전달 검증
+- 권한과 SELinux 이해
+
+권장 확장 순서:
+1. 앱에서 표준 차량 속성 읽기
+2. Fake VHAL에 차량 시나리오 추가
+3. vendor property 도입
+4. custom manager / custom service 도입
+5. 외부 ECU simulator 연결
+6. permission / SELinux / test 체계 보강
+
 ## 7. 소프트 실시간 기능 정의
 
 이 프로젝트에서 구현 가치가 가장 큰 실시간 기능은 주문 추천보다 `Safety UI Downgrade Guard`입니다.
