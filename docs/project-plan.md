@@ -14,11 +14,20 @@
 
 이 프로젝트는 차량이 드라이브스루 구역에 진입하는 순간 차량 디스플레이(CID)가 자동으로 터치 메뉴판으로 전환되어, 운전자가 익숙한 터치 UX로 안전하게 주문하는 시나리오를 AAOS 기반으로 구현합니다.
 
+이번 프로젝트는 아래 2단계 전략으로 진행합니다.
+
+1. 현재 단계
+   - `Car App Library` 기반으로 상태 전이, 탭 구조, 데이터 흐름, 안전 제한 로직을 먼저 검증한다.
+2. 목표 단계
+   - `AAOS Activity + Compose Custom UI`로 전환하여, OEM 스타일의 자유 레이아웃 주문 경험을 구현한다.
+
+즉 현재 구현은 템플릿 기반 프로토타입이고, 최종 목표는 OEM 앱 수준의 커스텀 UI 주문 시나리오다.
+
 ### 1.2 포트폴리오 목적 및 어필 포인트
 
 | 어필 포인트 | 구체적 내용 |
 | --- | --- |
-| AAOS 도메인 이해 | Car App Library, CarPropertyManager, VehicleHAL 구조 이해 및 적용 |
+| AAOS 도메인 이해 | Car App Library 프로토타이핑, Custom UI 전환, CarPropertyManager, VehicleHAL 구조 이해 및 적용 |
 | Driver Distraction 인지 | 주행/정차 상태에 따른 UI 분기, AAOS 가이드라인 실제 적용 |
 | 리눅스 임베디드 연결 | Yocto 경험을 라즈베리파이 HAL 연동으로 확장해 플랫폼 레이어 이해 증명 |
 | 실동작 데모 | 에뮬레이터 영상으로 면접 현장에서 바로 보여줄 수 있는 결과물 |
@@ -28,6 +37,32 @@
 
 이 프로젝트의 목적은 IVI 도메인을 학습하는 것입니다. 결제 완성, 실제 POS 연동, 상용 수준의 백엔드는 의도적으로 제외합니다.
 
+포함 범위:
+- 근처 드라이브스루 접근 감지
+- 어떤 매장의 주문 기능을 로드할지 판단하는 매장 해석 계층
+- 차량 상태와 안전 상태에 따라 Custom UI를 열거나 제한하는 정책
+- 주문 중 주행 시작 시 세션을 끊지 않고 `STOP_STATE`로 내리는 정책
+- HAL / CarProperty / GPS 데이터를 추상화한 상태 계층
+
+제외 범위:
+- 실제 상용 결제 승인
+- 실제 POS 주문 접수
+- OEM 시스템 권한이 필요한 모든 기능의 완전한 실차 검증
+
+### 1.4 현재 구현 단계와 목표 구현 단계
+
+현재 구현 단계:
+- `Car App Library` 기반 4개 메인 destination 프로토타입
+- 메뉴, 카트, 주문, 설정 흐름의 정보 구조 검증
+- 상태 저장소와 데이터 분리 구조 검증
+
+목표 구현 단계:
+- `AAOS Custom UI` 기반 자유 레이아웃 주문 UI
+- GPS/Geofence/매장 판별 후 주문 앱 자동 실행
+- 차량 정지 가능 상태에서만 full ordering UI 진입
+- 주행 시작 시 `STOP_STATE`로 내려가 세션 유지
+- 추후 OEM 권한이 가능한 환경에서는 실제 차량 신호 연동 검증
+
 ---
 
 ## 2. 시스템 아키텍처
@@ -36,23 +71,30 @@
 
 ```text
 [차량 레이어]
-  AAOS 에뮬레이터 / 라즈베리파이 AOSP
-  └── Car App Library 앱
-        ├── GPS Geofence 진입 감지
-        ├── CarPropertyManager 기어 상태 감지
-        └── 메뉴 UI 표시 (P단: 전체 / D단: 간소화)
+  AAOS Emulator / AAOS Device
+  ├── Phase A: Car App Library prototype
+  │     └── state flow / safety gating / data flow validation
+  └── Phase B: Custom UI Ordering App
+        ├── GPS / geofence proximity detection
+        ├── store resolver
+        ├── CarProperty / HAL vehicle state monitor
+        ├── ordering session controller
+        └── Compose-based custom ordering UI
 
-          ↕ Firebase Realtime Database
+[플랫폼 이벤트 레이어]
+  Vehicle HAL / Car Service / CarPropertyManager
+  Android location / geofence provider
+  Debug simulator bridge
 
-[클라우드 레이어]
-  Firebase Realtime Database
-  └── 메뉴 데이터 / 주문 상태 실시간 동기화
+[주문 데이터 레이어]
+  store metadata
+  menu bundle / quick-order bundle
+  session cache
+  payment mock state
 
-          ↕ Firebase Realtime Database
-
-[매장 레이어]
-  직원 웹 대시보드 (React)
-  └── 주문 확인 / 메뉴 품절 처리 -> 차량 화면 즉시 반영
+[매장 / 시뮬레이터 레이어]
+  web dashboard / drive-thru zone simulator
+  └── entry, exit, park, drive, stop 이벤트 공급
 ```
 
 ### 2.2 기술 스택
@@ -60,14 +102,25 @@
 | 레이어 | 기술 | 역할 |
 | --- | --- | --- |
 | 차량 OS | Android Automotive OS (API 33) | 차량 전용 안드로이드 플랫폼 |
-| UI 프레임워크 | Car App Library 1.4+ | AAOS 화면 규격 준수 UI |
+| UI 프레임워크 A | Car App Library 1.4+ | 초기 템플릿 기반 프로토타입 |
+| UI 프레임워크 B | Android Activity + Compose | 최종 Custom UI 주문 경험 |
 | 진입 감지 | Google Maps Geofencing API | GPS 좌표 기반 진입 이벤트 |
 | 차량 상태 | CarPropertyManager | 기어, 속도 등 차량 속성 감지 |
 | 차량 HAL 인터페이스 | AIDL Vehicle HAL 우선, HIDL 구조 비교 학습 | 플랫폼 신호 추상화 및 레거시 HAL 이해 |
-| 실시간 DB | Firebase Realtime Database | 메뉴, 주문 양방향 동기화 |
+| 위치/신호 추상화 | VehicleSignalProvider / StoreResolver | GPS, 기어, 속도, 정지 상태 판단 |
+| 세션 정책 | OrderingSessionController / StopStatePolicy | 주문 중 주행 시 세션 유지 및 백그라운드 정책 |
+| 실시간 DB | Firebase Realtime Database 또는 mock | 메뉴, 주문 상태 동기화 실험 |
 | 언어 | Kotlin | AAOS 앱 및 직원 앱 개발 |
 | 에뮬레이터 | Android Studio AVD (Automotive) | 실기기 없이 전 기능 시연 |
 | 임베디드 (Phase 5) | Raspberry Pi 4 + AOSP/Linux | HAL 연동 및 디바이스 노드 실습 |
+
+### 2.3 핵심 아키텍처 결론
+
+- `Car App Library`는 현재 단계의 구조 검증용이다.
+- 최종 목표 UI는 `Custom UI`다.
+- 매장 접근 판단과 차량 안전 상태 판단은 UI 밖의 상태 계층에서 처리한다.
+- 주문 중 차량이 다시 움직이면 세션을 종료하지 않고 `STOP_STATE`로 내려간다.
+- `STOP_STATE`에서는 화면이 백그라운드로 빠지거나 제한 모드로 전환되더라도 주문 draft와 세션 데이터는 유지한다.
 
 ---
 

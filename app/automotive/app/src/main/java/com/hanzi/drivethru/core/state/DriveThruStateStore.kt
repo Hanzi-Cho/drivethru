@@ -64,6 +64,8 @@ class DriveThruStateStore(
             }
     }
 
+    fun hasCartItems(): Boolean = cartQuantities.isNotEmpty()
+
     fun incrementCartItem(itemId: String) {
         addMenuItem(itemId)
     }

@@ -11,6 +11,7 @@
     <string name="action_add">ADD</string>
     <string name="menu_summary_title">Cart total %1$s</string>
     <string name="menu_summary_subtitle">%1$s items selected</string>
+    <string name="cart_empty_message">Your cart is empty. Add menu items first, then return here to review and pay.</string>
     <string name="cart_pay_now">Pay now</string>
     <string name="cart_back_to_menu">Back to menu</string>
     <string name="cart_total_row">Total %1$s</string>

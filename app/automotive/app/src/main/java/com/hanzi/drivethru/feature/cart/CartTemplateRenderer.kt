@@ -3,6 +3,7 @@ package com.hanzi.drivethru.feature.cart
 import androidx.car.app.CarContext
 import androidx.car.app.model.Action
 import androidx.car.app.model.CarColor
+import androidx.car.app.model.MessageTemplate
 import androidx.car.app.model.Pane
 import androidx.car.app.model.PaneTemplate
 import androidx.car.app.model.Row
@@ -19,6 +20,10 @@ class CartTemplateRenderer(
     private val onStateChanged: () -> Unit,
 ) {
     fun render(): Template {
+        if (!stateStore.hasCartItems()) {
+            return buildEmptyCartTemplate()
+        }
+
         val pane = Pane.Builder()
             .addRow(DriveThruTemplateSupport.buildStatusRow(stateStore.getGlobalStatus()))
             .apply {
@@ -49,6 +54,23 @@ class CartTemplateRenderer(
             .build()
 
         return PaneTemplate.Builder(pane).build()
+    }
+
+    private fun buildEmptyCartTemplate(): Template {
+        return MessageTemplate.Builder(
+            carContext.getString(R.string.cart_empty_message),
+        )
+            .setTitle(carContext.getString(R.string.destination_cart))
+            .addAction(
+                Action.Builder()
+                    .setTitle(carContext.getString(R.string.cart_back_to_menu))
+                    .setOnClickListener {
+                        stateStore.selectDestination(AppDestination.MENU)
+                        onStateChanged()
+                    }
+                    .build(),
+            )
+            .build()
     }
 
     private fun buildCartRow(item: CartLineItem): Row {

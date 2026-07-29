@@ -11,6 +11,16 @@
 
 그래서 첫 구현 우선순위는 "인프라 연동"보다 "차량 앱 상태 모델과 화면 전환 구조"입니다.
 
+추가로 현재 프로젝트는 아래 두 층으로 해석해야 합니다.
+
+1. 현재 구현 층
+   - `Car App Library` 기반 프로토타입
+   - 상태 전이, 탭 구조, 데이터 흐름, 안전 제한 정책 검증
+2. 목표 구현 층
+   - `AAOS Activity + Compose Custom UI`
+   - OEM 스타일의 드라이브스루 주문 경험
+   - 자동 실행, 자동 제한, 세션 보존, STOP STATE 정책 구현
+
 ## 2. 권장 저장소 구조
 
 초기에는 모노레포처럼 운영하되, 앱 경계를 분명히 나누는 구성이 가장 좋습니다.
@@ -49,6 +59,7 @@ app/automotive/app/src/main/java/.../drivethru/
   app/
     DriveThruCarAppService.kt
     DriveThruSession.kt
+    DriveThruActivity.kt
   core/
     model/
       DriveThruState.kt
@@ -56,13 +67,19 @@ app/automotive/app/src/main/java/.../drivethru/
       VehicleSignal.kt
       VehicleSignalSnapshot.kt
       VehicleMotionState.kt
+      VehicleAvailabilityState.kt
       Store.kt
+      StoreCapability.kt
       MenuItem.kt
       OrderDraft.kt
+      OrderingSession.kt
+      StopStateReason.kt
     state/
       DriveThruStateStore.kt
       SafetyCriticalStateMachine.kt
       CriticalCommandStateMachine.kt
+      OrderingSessionController.kt
+      StopStatePolicy.kt
     navigation/
       DriveThruNavigator.kt
   data/
@@ -77,6 +94,8 @@ app/automotive/app/src/main/java/.../drivethru/
     geofence/
       EntryTriggerDataSource.kt
       FakeEntryTriggerDataSource.kt
+      StoreResolver.kt
+      FakeStoreResolver.kt
     menu/
       MenuRepository.kt
       FakeMenuRepository.kt
@@ -87,6 +106,19 @@ app/automotive/app/src/main/java/.../drivethru/
       ExternalCommandGateway.kt
       FakeExternalCommandGateway.kt
   feature/
+    carapp/
+      root/
+      menu/
+      cart/
+      order/
+      settings/
+    customui/
+      shell/
+      standby/
+      menu/
+      cart/
+      payment/
+      stopstate/
     home/
       DriveThruHomeScreen.kt
     menu/
@@ -116,10 +148,12 @@ app/automotive/app/src/main/java/.../drivethru/
 ```text
 Idle
 WaitingForEntry
-StoreDetected(storeId)
+StoreResolved(storeId, capabilities)
+ReadyToLaunchCustomUi(storeId)
 BrowsingMenu(storeId, gearState)
 ReviewingOrder(storeId, orderDraft)
 OrderSubmitted(orderId)
+StopState(activeSession, reason)
 StoreUnavailable
 ```
 
@@ -140,6 +174,34 @@ STOPPED
 - 비P 상태에서는 즐겨찾기/최근 주문 중심 간소화 화면만 허용
 - 매장 진입 전에는 주문 UI 자체를 노출하지 않음
 - 전체 메뉴가 열린 뒤라도 `gear != PARK` 또는 `speed > 0.5 m/s`가 감지되면 100ms 이내 안전 화면으로 강등
+- 주문 중 주행 시작 시 `StopState`로 전환하고 draft/order session은 메모리 또는 로컬 저장소에 유지
+- `StopState`는 "종료"가 아니라 "일시 중단"이다
+
+## 5.1 STOP STATE 정책
+
+`STOP_STATE`는 이 프로젝트의 중요한 포트폴리오 포인트다.
+
+정의:
+- 주문 세션이 활성화된 상태에서 차량이 다시 주행 가능 상태가 되면, 앱은 커스텀 주문 UI를 계속 전면 노출하지 않는다.
+- 대신 세션을 보존하고 UI를 제한 또는 백그라운드 상태로 전환한다.
+
+정책:
+- 유지 대상
+  - 현재 store id
+  - 메뉴 draft
+  - payment selected method
+  - session timestamp
+- 금지 대상
+  - full menu interaction 지속
+  - 복잡한 결제 입력 지속
+  - 신규 deep interaction 진입
+- 복귀 조건
+  - 속도 0
+  - 안전 상태 충족
+  - OEM 정책 또는 앱 정책상 custom UI 재표시 가능
+
+핵심 메시지:
+- `STOP_STATE`는 데이터 유실 방지와 안전 제한을 동시에 만족시키는 세션 보호 상태다.
 
 ## 6. 차량 신호 추상화 원칙
 
@@ -153,12 +215,40 @@ DriveThruStateStore / SafetyCriticalStateMachine
               <- CarService
                   <- AIDL Vehicle HAL (primary)
                   <- HIDL Vehicle HAL (legacy/reference)
+
+DriveThruStateStore / OrderingSessionController
+  <- StoreResolver
+      <- Geofence / GPS / simulator event
 ```
 
 핵심 원칙:
 - 앱은 `CarPropertyManager` 아래 전송 세부사항을 직접 알지 않습니다.
 - 앱은 `VehicleSignalSnapshot(gear, speed, timestamp)`만 소비합니다.
 - AIDL/HIDL 차이는 플랫폼 실험 단계에서만 드러나고, 앱 상태 머신은 동일하게 유지합니다.
+- 앱은 `StoreResolver`가 해석한 `storeId`, `capabilities`, `menuSource`만 소비합니다.
+- "어떤 가게 주문 기능을 가져올지" 판단은 UI가 아니라 resolver 계층 책임입니다.
+
+## 6.1 자동 실행 시나리오
+
+최종 목표 시나리오는 아래와 같습니다.
+
+```text
+GPS/geofence proximity detected
+  -> StoreResolver identifies store + available ordering capability
+  -> OrderingSessionController preloads menu bundle
+  -> VehicleSignalProvider confirms safe display condition
+  -> Custom UI ordering app launches
+  -> User browses / orders / pays
+  -> Vehicle starts moving
+  -> StopStatePolicy sends UI to restricted/background mode
+  -> Session survives
+  -> Safe state restored
+  -> Session resumes or closes
+```
+
+중요:
+- 일반 서드파티 앱 관점에서는 자동 Activity 전면 실행은 OEM 정책에 크게 좌우된다.
+- 본 프로젝트는 최종적으로 OEM-style custom UI 시나리오를 목표로 문서화한다.
 
 ## 7. 소프트 실시간 기능 정의
 
@@ -218,6 +308,29 @@ AAOS 앱 기본 골격 생성
 - `CarAppService`, `Session`, 첫 `Screen` 연결
 - 하드코딩된 `DriveThruStateStore` 추가
 - `WaitingForEntry -> SimplifiedMenu -> FullMenu` 수동 전환 가능하게 구성
+
+### 추천 Step 2
+
+프로토타입과 최종 목표를 분리
+- `feature/carapp/*`는 구조 검증용으로 유지
+- `feature/customui/*` 경로 신설
+- `DriveThruActivity + Compose` 기반 shell 준비
+
+### 추천 Step 3
+
+차량 상태/매장 해석/세션 정책 도입
+- `VehicleSignalProvider`
+- `StoreResolver`
+- `OrderingSessionController`
+- `StopStatePolicy`
+
+### 추천 Step 4
+
+최종 시연 시나리오 연결
+- GPS 또는 simulator 진입 이벤트
+- 안전 상태 충족 시 custom UI 오픈
+- 주문 중 주행 시 STOP STATE
+- 정지 복귀 시 세션 resume 또는 close
 
 ### 추천 Step 2
 
