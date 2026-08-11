@@ -2,11 +2,15 @@ package com.hanzi.drivethru.feature.customui
 
 import com.hanzi.drivethru.core.model.CustomUiDestination
 import com.hanzi.drivethru.core.model.CustomUiViewState
+import com.hanzi.drivethru.core.model.DriveThruLanePoint
+import com.hanzi.drivethru.core.model.DriveThruZoneStage
+import com.hanzi.drivethru.core.model.EntryTriggerEvent
 import com.hanzi.drivethru.core.model.GearState
-import com.hanzi.drivethru.core.model.VehicleSignalSnapshot
 import com.hanzi.drivethru.core.state.DriveThruSafetyPolicy
 import com.hanzi.drivethru.core.state.OrderingSessionController
 import com.hanzi.drivethru.core.state.StopStatePolicy
+import com.hanzi.drivethru.data.entry.EntryTriggerProvider
+import com.hanzi.drivethru.data.menu.FirebaseMenuRepository
 import com.hanzi.drivethru.data.menu.MenuRepository
 import com.hanzi.drivethru.data.store.StoreResolver
 import com.hanzi.drivethru.data.vehicle.VehicleSignalProvider
@@ -14,6 +18,7 @@ import com.hanzi.drivethru.data.vehicle.VehicleSignalProvider
 class CustomUiFlowCoordinator(
     private val menuRepository: MenuRepository,
     private val vehicleSignalProvider: VehicleSignalProvider,
+    private val entryTriggerProvider: EntryTriggerProvider,
     private val storeResolver: StoreResolver,
     private val orderingSessionController: OrderingSessionController,
     private val safetyPolicy: DriveThruSafetyPolicy,
@@ -26,21 +31,55 @@ class CustomUiFlowCoordinator(
         activeStore = null,
         vehicleSignal = vehicleSignalProvider.getSnapshot(),
         orderDraft = null,
+        entryTriggerEvent = entryTriggerProvider.currentEvent(),
         stopStateReason = null,
         statusMessage = "Waiting for a drive-thru entry event.",
+        firebaseStatus = resolveFirebaseStatus(),
     )
 
     fun getViewState(): CustomUiViewState = viewState
+    fun getMenuItems() = menuRepository.getAllMenuItems()
+    fun getCarSignalReadings() = vehicleSignalProvider.getDiagnostics()
+
+    fun simulateGpsTrigger(stage: DriveThruZoneStage, lanePoint: DriveThruLanePoint?) {
+        entryTriggerProvider.simulateGps(
+            stage = stage,
+            latitude = 37.4979,
+            longitude = 127.0276,
+            lanePoint = lanePoint,
+        )
+        syncEntryTrigger()
+    }
+
+    fun simulateBeaconTrigger(stage: DriveThruZoneStage, lanePoint: DriveThruLanePoint?) {
+        entryTriggerProvider.simulateBeacon(
+            stage = stage,
+            beaconId = "beacon-demo-001",
+            lanePoint = lanePoint,
+        )
+        syncEntryTrigger()
+    }
+
+    fun resetEntryTrigger() {
+        entryTriggerProvider.resetToOutside()
+        closeSession()
+    }
 
     fun enterDemoStore() {
-        val store = storeResolver.resolveStore() ?: return
+        simulateGpsTrigger(DriveThruZoneStage.ORDERING_READY, DriveThruLanePoint.MENU_BOARD)
+    }
+
+    private fun activateStore(entryTriggerEvent: EntryTriggerEvent) {
+        val store = storeResolver.resolveStore(entryTriggerEvent) ?: return
         orderingSessionController.startSession(store)
         viewState = viewState.copy(
             destination = CustomUiDestination.STORE_READY,
             activeStore = store,
             orderDraft = orderingSessionController.getActiveSession()?.orderDraft,
+            entryTriggerEvent = entryTriggerEvent,
             stopStateReason = null,
             statusMessage = "Store detected. Park the vehicle to open full ordering UI.",
+            firebaseStatus = resolveFirebaseStatus(),
         )
         syncVehicleSignal()
     }
@@ -75,6 +114,7 @@ class CustomUiFlowCoordinator(
             stopStateReason = null,
             orderDraft = orderingSessionController.getActiveSession()?.orderDraft,
             statusMessage = "Full ordering UI is active.",
+            firebaseStatus = resolveFirebaseStatus(),
         )
     }
 
@@ -86,6 +126,7 @@ class CustomUiFlowCoordinator(
             destination = CustomUiDestination.FULL_MENU,
             orderDraft = orderingSessionController.getActiveSession()?.orderDraft,
             statusMessage = "${menuItem.name} added to the draft.",
+            firebaseStatus = resolveFirebaseStatus(),
         )
     }
 
@@ -102,6 +143,7 @@ class CustomUiFlowCoordinator(
             destination = CustomUiDestination.CART_REVIEW,
             orderDraft = orderingSessionController.getActiveSession()?.orderDraft,
             statusMessage = "Review the current draft before proceeding.",
+            firebaseStatus = resolveFirebaseStatus(),
         )
     }
 
@@ -122,6 +164,7 @@ class CustomUiFlowCoordinator(
             stopStateReason = null,
             orderDraft = orderingSessionController.getActiveSession()?.orderDraft,
             statusMessage = "Vehicle returned to a safe state. Ordering resumed.",
+            firebaseStatus = resolveFirebaseStatus(),
         )
     }
 
@@ -131,9 +174,21 @@ class CustomUiFlowCoordinator(
             destination = CustomUiDestination.STANDBY,
             activeStore = null,
             orderDraft = null,
+            entryTriggerEvent = entryTriggerProvider.currentEvent(),
             stopStateReason = null,
             statusMessage = "Session closed. Waiting for the next entry event.",
+            firebaseStatus = resolveFirebaseStatus(),
         )
+    }
+
+    private fun syncEntryTrigger() {
+        val event = entryTriggerProvider.currentEvent()
+        if (event.stage == DriveThruZoneStage.OUTSIDE || event.stage == DriveThruZoneStage.EXIT) {
+            closeSession()
+            return
+        }
+
+        activateStore(event)
     }
 
     private fun syncVehicleSignal() {
@@ -145,8 +200,10 @@ class CustomUiFlowCoordinator(
                 destination = CustomUiDestination.STOP_STATE,
                 vehicleSignal = snapshot,
                 orderDraft = orderingSessionController.getActiveSession()?.orderDraft,
+                entryTriggerEvent = entryTriggerProvider.currentEvent(),
                 stopStateReason = stopStateReason,
                 statusMessage = "Vehicle safety guard engaged. Resume only after returning to PARK.",
+                firebaseStatus = resolveFirebaseStatus(),
             )
         } else {
             val nextDestination = when {
@@ -158,13 +215,23 @@ class CustomUiFlowCoordinator(
                 destination = nextDestination,
                 vehicleSignal = snapshot,
                 orderDraft = orderingSessionController.getActiveSession()?.orderDraft,
+                entryTriggerEvent = entryTriggerProvider.currentEvent(),
                 stopStateReason = null,
                 statusMessage = when (nextDestination) {
                     CustomUiDestination.FULL_MENU ->
                         "Safe state confirmed. Full ordering UI is available."
                     else -> viewState.statusMessage
                 },
+                firebaseStatus = resolveFirebaseStatus(),
             )
+        }
+    }
+
+    private fun resolveFirebaseStatus(): String {
+        return if (menuRepository is FirebaseMenuRepository) {
+            menuRepository.getSyncStatus()
+        } else {
+            "Firebase repository disabled. Fake menu repository active."
         }
     }
 }

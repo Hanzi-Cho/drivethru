@@ -1,9 +1,12 @@
 package com.hanzi.drivethru.app
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -30,16 +33,20 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.hanzi.drivethru.core.model.CarSignalReading
 import com.hanzi.drivethru.core.model.CustomUiDestination
 import com.hanzi.drivethru.core.model.CustomUiViewState
+import com.hanzi.drivethru.core.model.DriveThruLanePoint
+import com.hanzi.drivethru.core.model.DriveThruUiMode
+import com.hanzi.drivethru.core.model.DriveThruZoneStage
 import com.hanzi.drivethru.core.model.GearState
 import com.hanzi.drivethru.core.model.MenuItem
 import com.hanzi.drivethru.core.model.StopStateReason
-import com.hanzi.drivethru.data.menu.FakeMenuRepository
 import com.hanzi.drivethru.di.AppContainer
 import com.hanzi.drivethru.feature.customui.CustomUiFlowCoordinator
 
@@ -47,16 +54,27 @@ class DriveThruActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val container = AppContainer()
+        val container = AppContainer(applicationContext)
         setContent {
             MaterialTheme {
-                Surface(color = Color(0xFF101418)) {
+                Surface(color = Color(0xFF0E1318)) {
                     DriveThruCustomUiApp(
                         coordinator = container.customUiFlowCoordinator,
-                        menuItems = FakeMenuRepository().getAllMenuItems(),
+                        onLaunchTemplateApp = { launchTemplateApp() },
                     )
                 }
             }
+        }
+    }
+
+    private fun launchTemplateApp() {
+        runCatching {
+            startActivity(
+                Intent().setClassName(
+                    packageName,
+                    "androidx.car.app.activity.CarAppActivity",
+                ),
+            )
         }
     }
 }
@@ -64,32 +82,53 @@ class DriveThruActivity : ComponentActivity() {
 @Composable
 private fun DriveThruCustomUiApp(
     coordinator: CustomUiFlowCoordinator,
-    menuItems: List<MenuItem>,
+    onLaunchTemplateApp: () -> Unit,
 ) {
     var viewState by remember { mutableStateOf(coordinator.getViewState()) }
+    var uiMode by remember { mutableStateOf(DriveThruUiMode.ENHANCED_CUSTOM) }
 
     fun refreshState() {
         viewState = coordinator.getViewState()
     }
 
+    val menuItems = coordinator.getMenuItems()
+    val diagnostics = coordinator.getCarSignalReadings()
+
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF101418))
-            .padding(24.dp),
+            .background(Color(0xFF0E1318))
+            .padding(20.dp),
     ) {
-        Column(
-            modifier = Modifier.fillMaxSize(),
-        ) {
-            HeaderSection(viewState = viewState)
-            Spacer(modifier = Modifier.height(16.dp))
+        Column(modifier = Modifier.fillMaxSize()) {
+            HeaderSection(viewState = viewState, uiMode = uiMode)
+            Spacer(modifier = Modifier.height(14.dp))
+            ModeSelector(
+                currentMode = uiMode,
+                onSelectMode = { uiMode = it },
+                onLaunchTemplateApp = onLaunchTemplateApp,
+            )
+            Spacer(modifier = Modifier.height(14.dp))
             DebugControlPanel(
-                onEnterDemoStore = {
-                    coordinator.enterDemoStore()
+                onGpsApproaching = {
+                    coordinator.simulateGpsTrigger(DriveThruZoneStage.APPROACHING, DriveThruLanePoint.ENTRANCE)
+                    refreshState()
+                },
+                onGpsReady = {
+                    coordinator.simulateGpsTrigger(DriveThruZoneStage.ORDERING_READY, DriveThruLanePoint.MENU_BOARD)
+                    refreshState()
+                },
+                onBeaconReady = {
+                    coordinator.simulateBeaconTrigger(DriveThruZoneStage.ORDERING_READY, DriveThruLanePoint.MENU_BOARD)
+                    refreshState()
+                },
+                onExitZone = {
+                    coordinator.resetEntryTrigger()
                     refreshState()
                 },
                 onSetPark = {
                     coordinator.setGearState(GearState.PARK)
+                    coordinator.setVehicleSpeed(0.0)
                     refreshState()
                 },
                 onSetDrive = {
@@ -105,49 +144,42 @@ private fun DriveThruCustomUiApp(
                     refreshState()
                 },
             )
-            Spacer(modifier = Modifier.height(16.dp))
-            CurrentScreen(
-                viewState = viewState,
-                menuItems = menuItems,
-                onOpenFullMenu = {
-                    coordinator.openFullMenu()
-                    refreshState()
-                },
-                onAddMenuItem = { itemId ->
-                    coordinator.addMenuItem(itemId)
-                    refreshState()
-                },
-                onOpenCartReview = {
-                    coordinator.openCartReview()
-                    refreshState()
-                },
-                onResumeOrdering = {
-                    coordinator.resumeOrdering()
-                    refreshState()
-                },
-                onCloseSession = {
-                    coordinator.closeSession()
-                    refreshState()
-                },
-            )
+            Spacer(modifier = Modifier.height(14.dp))
+            DiagnosticsPanel(viewState = viewState, diagnostics = diagnostics)
+            Spacer(modifier = Modifier.height(14.dp))
+            when (uiMode) {
+                DriveThruUiMode.CAR_TEMPLATE -> TemplateReferencePanel(onLaunchTemplateApp = onLaunchTemplateApp)
+                DriveThruUiMode.CLASSIC_CUSTOM -> ClassicScreen(
+                    viewState = viewState,
+                    menuItems = menuItems,
+                    coordinator = coordinator,
+                    refreshState = ::refreshState,
+                )
+                DriveThruUiMode.ENHANCED_CUSTOM -> EnhancedScreen(
+                    viewState = viewState,
+                    menuItems = menuItems,
+                    coordinator = coordinator,
+                    refreshState = ::refreshState,
+                )
+            }
         }
     }
 }
 
 @Composable
-private fun HeaderSection(viewState: CustomUiViewState) {
+private fun HeaderSection(viewState: CustomUiViewState, uiMode: DriveThruUiMode) {
     Card(
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF1A2128)),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF161D24)),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
             Text(
-                text = "DriveThru Custom UI Preview",
+                text = "DriveThru IVI Studio",
                 color = Color.White,
-                fontSize = 26.sp,
+                fontSize = 28.sp,
                 fontWeight = FontWeight.Bold,
             )
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(6.dp))
             Text(
                 text = viewState.statusMessage,
                 color = Color(0xFFD5DBE1),
@@ -155,9 +187,44 @@ private fun HeaderSection(viewState: CustomUiViewState) {
             )
             Spacer(modifier = Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                StatusChip("Mode ${uiMode.name}")
                 StatusChip("Gear ${viewState.vehicleSignal.gearState.name}")
-                StatusChip("Speed %.1f m/s".format(viewState.vehicleSignal.speedMetersPerSecond))
-                StatusChip(viewState.destination.name.replace('_', ' '))
+                StatusChip("Speed %.1f".format(viewState.vehicleSignal.speedMetersPerSecond))
+                StatusChip(viewState.entryTriggerEvent?.stage?.name ?: "NO_TRIGGER")
+            }
+        }
+    }
+}
+
+@Composable
+private fun ModeSelector(
+    currentMode: DriveThruUiMode,
+    onSelectMode: (DriveThruUiMode) -> Unit,
+    onLaunchTemplateApp: () -> Unit,
+) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF131A20)),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("UI mode", color = Color.White, fontWeight = FontWeight.SemiBold)
+            DriveThruUiMode.entries.forEach { mode ->
+                val selected = currentMode == mode
+                val onClick = {
+                    onSelectMode(mode)
+                    if (mode == DriveThruUiMode.CAR_TEMPLATE) {
+                        onLaunchTemplateApp()
+                    }
+                }
+                if (selected) {
+                    Button(onClick = onClick) { Text(mode.name) }
+                } else {
+                    OutlinedButton(onClick = onClick) { Text(mode.name) }
+                }
             }
         }
     }
@@ -167,7 +234,7 @@ private fun HeaderSection(viewState: CustomUiViewState) {
 private fun StatusChip(label: String) {
     Box(
         modifier = Modifier
-            .background(Color(0xFF2B343D), shape = MaterialTheme.shapes.small)
+            .background(Color(0xFF25303A), shape = MaterialTheme.shapes.small)
             .padding(horizontal = 12.dp, vertical = 8.dp),
     ) {
         Text(text = label, color = Color(0xFFFFD166), fontSize = 12.sp)
@@ -176,23 +243,32 @@ private fun StatusChip(label: String) {
 
 @Composable
 private fun DebugControlPanel(
-    onEnterDemoStore: () -> Unit,
+    onGpsApproaching: () -> Unit,
+    onGpsReady: () -> Unit,
+    onBeaconReady: () -> Unit,
+    onExitZone: () -> Unit,
     onSetPark: () -> Unit,
     onSetDrive: () -> Unit,
     onSetStopped: () -> Unit,
     onSetMoving: () -> Unit,
 ) {
     Card(
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF171E24)),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF131A20)),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text("Debug input", color = Color.White, fontWeight = FontWeight.SemiBold)
-            Spacer(modifier = Modifier.height(12.dp))
+            Text("Simulation controls", color = Color.White, fontWeight = FontWeight.SemiBold)
+            Spacer(modifier = Modifier.height(10.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Button(onClick = onEnterDemoStore) { Text("Enter demo store") }
-                OutlinedButton(onClick = onSetPark) { Text("Set PARK") }
-                OutlinedButton(onClick = onSetDrive) { Text("Set DRIVE") }
+                OutlinedButton(onClick = onGpsApproaching) { Text("GPS approach") }
+                OutlinedButton(onClick = onGpsReady) { Text("GPS ready") }
+                OutlinedButton(onClick = onBeaconReady) { Text("Beacon ready") }
+                OutlinedButton(onClick = onExitZone) { Text("Exit zone") }
+            }
+            Spacer(modifier = Modifier.height(10.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedButton(onClick = onSetPark) { Text("PARK + stop") }
+                OutlinedButton(onClick = onSetDrive) { Text("DRIVE") }
                 OutlinedButton(onClick = onSetStopped) { Text("Speed 0.0") }
                 OutlinedButton(onClick = onSetMoving) { Text("Speed 3.5") }
             }
@@ -201,57 +277,281 @@ private fun DebugControlPanel(
 }
 
 @Composable
-private fun CurrentScreen(
+private fun DiagnosticsPanel(
+    viewState: CustomUiViewState,
+    diagnostics: List<CarSignalReading>,
+) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF10171D)),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text("Runtime diagnostics", color = Color.White, fontWeight = FontWeight.SemiBold)
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                "Firebase: ${viewState.firebaseStatus}",
+                color = Color(0xFFD5DBE1),
+                fontSize = 13.sp,
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            diagnostics.forEach { reading ->
+                Text(
+                    "${reading.type.name} = ${reading.rawValue} (${reading.status.name}, ${reading.source.name})",
+                    color = if (reading.status.name == "OK") Color(0xFFB7F5C5) else Color(0xFFFFD9A8),
+                    fontSize = 12.sp,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun TemplateReferencePanel(onLaunchTemplateApp: () -> Unit) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF171E24)),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(modifier = Modifier.padding(24.dp)) {
+            Text("Car App Template mode", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(10.dp))
+            Text(
+                "This mode keeps the current Car App Library reference experience available for study and portfolio comparison.",
+                color = Color(0xFFD5DBE1),
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Button(onClick = onLaunchTemplateApp) {
+                Text("Launch template app host")
+            }
+        }
+    }
+}
+
+@Composable
+private fun ClassicScreen(
     viewState: CustomUiViewState,
     menuItems: List<MenuItem>,
-    onOpenFullMenu: () -> Unit,
-    onAddMenuItem: (String) -> Unit,
-    onOpenCartReview: () -> Unit,
-    onResumeOrdering: () -> Unit,
-    onCloseSession: () -> Unit,
+    coordinator: CustomUiFlowCoordinator,
+    refreshState: () -> Unit,
 ) {
     when (viewState.destination) {
         CustomUiDestination.STANDBY -> {
-            InfoPanel(
-                title = "Standby",
-                body = "Waiting for a fake entry trigger. Use the debug panel to simulate store entry.",
-            )
+            InfoPanel("Standby", "Waiting for a simulated GPS or beacon trigger.")
         }
 
         CustomUiDestination.STORE_READY -> {
             InfoPanel(
-                title = "Store detected",
-                body = "Active store: ${viewState.activeStore?.name ?: "Unknown"}. Full ordering opens automatically or manually once the vehicle is in PARK.",
+                "Store detected",
+                "Store: ${viewState.activeStore?.name ?: "Unknown"}. Shift to PARK to unlock full ordering.",
                 primaryAction = "Open full menu",
-                onPrimaryAction = onOpenFullMenu,
-            )
+            ) {
+                coordinator.openFullMenu()
+                refreshState()
+            }
         }
 
         CustomUiDestination.FULL_MENU -> {
-            MenuPanel(
-                storeName = viewState.activeStore?.name ?: "Unknown store",
-                menuItems = menuItems,
-                draftItemCount = viewState.orderDraft?.items?.sumOf { it.quantity } ?: 0,
-                onAddMenuItem = onAddMenuItem,
-                onOpenCartReview = onOpenCartReview,
-            )
+            ClassicMenuPanel(viewState, menuItems, coordinator, refreshState)
         }
 
         CustomUiDestination.CART_REVIEW -> {
-            CartReviewPanel(
-                viewState = viewState,
-                onResumeOrdering = onResumeOrdering,
-                onCloseSession = onCloseSession,
-            )
+            CartReviewPanel(viewState, coordinator, refreshState)
         }
 
         CustomUiDestination.STOP_STATE -> {
-            StopStatePanel(
-                stopStateReason = viewState.stopStateReason,
-                draftItemCount = viewState.orderDraft?.items?.sumOf { it.quantity } ?: 0,
-                onResumeOrdering = onResumeOrdering,
-                onCloseSession = onCloseSession,
+            StopStatePanel(viewState.stopStateReason, viewState.orderDraft?.items?.sumOf { it.quantity } ?: 0, coordinator, refreshState)
+        }
+    }
+}
+
+@Composable
+private fun EnhancedScreen(
+    viewState: CustomUiViewState,
+    menuItems: List<MenuItem>,
+    coordinator: CustomUiFlowCoordinator,
+    refreshState: () -> Unit,
+) {
+    if (viewState.destination == CustomUiDestination.STANDBY || viewState.destination == CustomUiDestination.STORE_READY) {
+        ClassicScreen(viewState, menuItems, coordinator, refreshState)
+        return
+    }
+
+    Card(
+        modifier = Modifier
+            .fillMaxSize()
+            .border(BorderStroke(1.dp, Color(0xFF25303A)), MaterialTheme.shapes.large),
+        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.linearGradient(
+                        colors = listOf(Color(0xFF161E25), Color(0xFF0F141A)),
+                    ),
+                )
+                .padding(18.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            EnhancedCategoryRail()
+            EnhancedMenuPanel(
+                viewState = viewState,
+                menuItems = menuItems,
+                coordinator = coordinator,
+                refreshState = refreshState,
+                modifier = Modifier.weight(1.6f),
             )
+            EnhancedSummaryPanel(
+                viewState = viewState,
+                coordinator = coordinator,
+                refreshState = refreshState,
+                modifier = Modifier.weight(1f),
+            )
+        }
+    }
+}
+
+@Composable
+private fun EnhancedCategoryRail() {
+    Card(
+        modifier = Modifier.width(180.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF1A222A)),
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text("Browse", color = Color.White, fontWeight = FontWeight.Bold)
+            listOf("Popular", "Burgers", "Drinks", "Sides", "Desserts").forEachIndexed { index, item ->
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            if (index == 0) Color(0xFFFFD166) else Color(0xFF24303A),
+                            shape = MaterialTheme.shapes.small,
+                        )
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                ) {
+                    Text(
+                        item,
+                        color = if (index == 0) Color(0xFF11161A) else Color.White,
+                        fontWeight = FontWeight.Medium,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EnhancedMenuPanel(
+    viewState: CustomUiViewState,
+    menuItems: List<MenuItem>,
+    coordinator: CustomUiFlowCoordinator,
+    refreshState: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    if (viewState.destination == CustomUiDestination.STOP_STATE) {
+        StopStatePanel(viewState.stopStateReason, viewState.orderDraft?.items?.sumOf { it.quantity } ?: 0, coordinator, refreshState)
+        return
+    }
+
+    Card(
+        modifier = modifier,
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF141C22)),
+    ) {
+        Column(modifier = Modifier.padding(18.dp)) {
+            Text(viewState.activeStore?.name ?: "DriveThru Store", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 24.sp)
+            Text("Enhanced portfolio ordering UI", color = Color(0xFFB8C6D1))
+            Spacer(modifier = Modifier.height(16.dp))
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                items(menuItems) { item ->
+                    Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF1E2932))) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(item.name, color = Color.White, fontWeight = FontWeight.SemiBold)
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(item.description, color = Color(0xFFB7C3CE), fontSize = 12.sp)
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text("KRW ${item.price}", color = Color(0xFFFFD166), fontWeight = FontWeight.Bold)
+                            }
+                            Button(onClick = {
+                                coordinator.addMenuItem(item.id)
+                                refreshState()
+                            }) {
+                                Text("Add")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EnhancedSummaryPanel(
+    viewState: CustomUiViewState,
+    coordinator: CustomUiFlowCoordinator,
+    refreshState: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Card(
+        modifier = modifier,
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF1A222A)),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text("Order summary", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 22.sp)
+            Text("Trigger source: ${viewState.entryTriggerEvent?.source?.name ?: "NONE"}", color = Color(0xFFB7C3CE))
+            Text("Zone stage: ${viewState.entryTriggerEvent?.stage?.name ?: "OUTSIDE"}", color = Color(0xFFB7C3CE))
+            Spacer(modifier = Modifier.height(4.dp))
+            viewState.orderDraft?.items?.forEach { item ->
+                Text("${item.menuItem.name} x${item.quantity}", color = Color.White)
+            }
+            Text(
+                "Total KRW ${viewState.orderDraft?.totalPrice ?: 0}",
+                color = Color(0xFFFFD166),
+                fontWeight = FontWeight.Bold,
+                fontSize = 18.sp,
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Button(
+                onClick = {
+                    coordinator.openCartReview()
+                    refreshState()
+                },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("Review current draft")
+            }
+            OutlinedButton(
+                onClick = {
+                    coordinator.resumeOrdering()
+                    refreshState()
+                },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("Resume / keep ordering")
+            }
+            OutlinedButton(
+                onClick = {
+                    coordinator.closeSession()
+                    refreshState()
+                },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("Close session")
+            }
         }
     }
 }
@@ -264,7 +564,7 @@ private fun InfoPanel(
     onPrimaryAction: (() -> Unit)? = null,
 ) {
     Card(
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF1A2128)),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF171E24)),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(modifier = Modifier.padding(24.dp)) {
@@ -280,17 +580,13 @@ private fun InfoPanel(
 }
 
 @Composable
-private fun MenuPanel(
-    storeName: String,
+private fun ClassicMenuPanel(
+    viewState: CustomUiViewState,
     menuItems: List<MenuItem>,
-    draftItemCount: Int,
-    onAddMenuItem: (String) -> Unit,
-    onOpenCartReview: () -> Unit,
+    coordinator: CustomUiFlowCoordinator,
+    refreshState: () -> Unit,
 ) {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF1A2128)),
-        modifier = Modifier.fillMaxSize(),
-    ) {
+    Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF171E24)), modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.padding(20.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -298,11 +594,14 @@ private fun MenuPanel(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Column {
-                    Text(storeName, color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
-                    Text("Safe full ordering state", color = Color(0xFFD5DBE1))
+                    Text(viewState.activeStore?.name ?: "DriveThru Store", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 24.sp)
+                    Text("Classic custom UI", color = Color(0xFFD5DBE1))
                 }
-                Button(onClick = onOpenCartReview) {
-                    Text("Review cart ($draftItemCount)")
+                Button(onClick = {
+                    coordinator.openCartReview()
+                    refreshState()
+                }) {
+                    Text("Review cart (${viewState.orderDraft?.items?.sumOf { it.quantity } ?: 0})")
                 }
             }
             Spacer(modifier = Modifier.height(16.dp))
@@ -320,11 +619,12 @@ private fun MenuPanel(
                                 Text(item.name, color = Color.White, fontWeight = FontWeight.SemiBold)
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text(item.description, color = Color(0xFFB6C2CD), fontSize = 13.sp)
-                                Spacer(modifier = Modifier.height(6.dp))
-                                Text("KRW ${item.price}", color = Color(0xFFFFD166))
                             }
                             Spacer(modifier = Modifier.width(12.dp))
-                            Button(onClick = { onAddMenuItem(item.id) }) {
+                            Button(onClick = {
+                                coordinator.addMenuItem(item.id)
+                                refreshState()
+                            }) {
                                 Text("Add")
                             }
                         }
@@ -338,30 +638,30 @@ private fun MenuPanel(
 @Composable
 private fun CartReviewPanel(
     viewState: CustomUiViewState,
-    onResumeOrdering: () -> Unit,
-    onCloseSession: () -> Unit,
+    coordinator: CustomUiFlowCoordinator,
+    refreshState: () -> Unit,
 ) {
     val draft = viewState.orderDraft
-    Card(
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF1A2128)),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
+    Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF171E24)), modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(24.dp)) {
             Text("Cart review", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(12.dp))
             draft?.items?.forEach { item ->
-                Text(
-                    "${item.menuItem.name} x${item.quantity} · KRW ${item.menuItem.price * item.quantity}",
-                    color = Color(0xFFD5DBE1),
-                )
+                Text("${item.menuItem.name} x${item.quantity} · KRW ${item.menuItem.price * item.quantity}", color = Color(0xFFD5DBE1))
                 Spacer(modifier = Modifier.height(6.dp))
             }
             Spacer(modifier = Modifier.height(12.dp))
             Text("Total KRW ${draft?.totalPrice ?: 0}", color = Color(0xFFFFD166), fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(16.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Button(onClick = onResumeOrdering) { Text("Back to ordering") }
-                OutlinedButton(onClick = onCloseSession) { Text("Close session") }
+                Button(onClick = {
+                    coordinator.resumeOrdering()
+                    refreshState()
+                }) { Text("Back to ordering") }
+                OutlinedButton(onClick = {
+                    coordinator.closeSession()
+                    refreshState()
+                }) { Text("Close session") }
             }
         }
     }
@@ -371,29 +671,26 @@ private fun CartReviewPanel(
 private fun StopStatePanel(
     stopStateReason: StopStateReason?,
     draftItemCount: Int,
-    onResumeOrdering: () -> Unit,
-    onCloseSession: () -> Unit,
+    coordinator: CustomUiFlowCoordinator,
+    refreshState: () -> Unit,
 ) {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF2A1717)),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
+    Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF2A1717)), modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(24.dp)) {
             Text("STOP_STATE", color = Color(0xFFFFD0D0), fontSize = 24.sp, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(10.dp))
-            Text(
-                "Reason: ${stopStateReason?.name ?: "UNKNOWN"}",
-                color = Color(0xFFFFE2A8),
-            )
+            Text("Reason: ${stopStateReason?.name ?: "UNKNOWN"}", color = Color(0xFFFFE2A8))
             Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                "The draft is preserved with $draftItemCount item(s). Return to PARK, then choose to continue.",
-                color = Color.White,
-            )
+            Text("The draft is preserved with $draftItemCount item(s). Return to PARK, then choose to continue.", color = Color.White)
             Spacer(modifier = Modifier.height(16.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Button(onClick = onResumeOrdering) { Text("Continue ordering") }
-                OutlinedButton(onClick = onCloseSession) { Text("Close session") }
+                Button(onClick = {
+                    coordinator.resumeOrdering()
+                    refreshState()
+                }) { Text("Continue ordering") }
+                OutlinedButton(onClick = {
+                    coordinator.closeSession()
+                    refreshState()
+                }) { Text("Close session") }
             }
         }
     }

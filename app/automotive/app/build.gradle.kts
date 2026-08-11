@@ -56,6 +56,7 @@ dependencies {
     implementation(libs.androidx.car.app)
     implementation(libs.androidx.car.app.automotive)
     implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.firebase.database.ktx)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.foundation)

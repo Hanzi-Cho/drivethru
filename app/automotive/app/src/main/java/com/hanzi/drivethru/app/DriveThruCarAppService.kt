@@ -9,7 +9,7 @@ import com.hanzi.drivethru.di.AppContainer
 
 class DriveThruCarAppService : CarAppService() {
     override fun onCreateSession(sessionInfo: SessionInfo): Session {
-        return DriveThruSession(AppContainer().stateStore)
+        return DriveThruSession(AppContainer(applicationContext).stateStore)
     }
 
     override fun createHostValidator(): HostValidator {

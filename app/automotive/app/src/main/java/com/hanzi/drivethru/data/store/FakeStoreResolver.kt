@@ -2,10 +2,12 @@ package com.hanzi.drivethru.data.store
 
 import com.hanzi.drivethru.core.model.Store
 import com.hanzi.drivethru.core.model.StoreCapability
+import com.hanzi.drivethru.core.model.DriveThruZoneStage
+import com.hanzi.drivethru.core.model.EntryTriggerEvent
 
 class FakeStoreResolver : StoreResolver {
-    override fun resolveStore(entryToken: String): Store? {
-        if (entryToken != "demo-store") {
+    override fun resolveStore(entryTriggerEvent: EntryTriggerEvent): Store? {
+        if (entryTriggerEvent.stage == DriveThruZoneStage.OUTSIDE || entryTriggerEvent.stage == DriveThruZoneStage.EXIT) {
             return null
         }
 

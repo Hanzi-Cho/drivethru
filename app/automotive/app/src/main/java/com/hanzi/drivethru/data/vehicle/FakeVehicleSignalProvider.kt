@@ -1,6 +1,8 @@
 package com.hanzi.drivethru.data.vehicle
 
 import com.hanzi.drivethru.core.model.GearState
+import com.hanzi.drivethru.core.model.CarSignalReading
+import com.hanzi.drivethru.core.model.CarSignalType
 import com.hanzi.drivethru.core.model.VehicleSignalSnapshot
 
 class FakeVehicleSignalProvider(
@@ -11,6 +13,7 @@ class FakeVehicleSignalProvider(
     ),
 ) : VehicleSignalProvider {
     private var currentSnapshot: VehicleSignalSnapshot = initialSnapshot
+    private val diagnostics = mutableMapOf<CarSignalType, CarSignalReading>()
 
     override fun getSnapshot(): VehicleSignalSnapshot = currentSnapshot
 
@@ -27,4 +30,6 @@ class FakeVehicleSignalProvider(
             timestampMillis = System.currentTimeMillis(),
         )
     }
+
+    override fun getDiagnostics(): List<CarSignalReading> = diagnostics.values.toList()
 }

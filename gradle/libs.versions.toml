@@ -14,6 +14,7 @@ androidx-compose-ui-test-junit4 = "1.6.8"
 androidx-test-ext-junit = "1.2.1"
 espresso-core = "3.6.1"
 junit4 = "4.13.2"
+firebase-database-ktx = "21.0.0"
 
 [libraries]
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "androidx-core-ktx" }
@@ -32,6 +33,7 @@ androidx-compose-ui-test-manifest = { module = "androidx.compose.ui:ui-test-mani
 androidx-test-ext-junit = { module = "androidx.test.ext:junit", version.ref = "androidx-test-ext-junit" }
 androidx-espresso-core = { module = "androidx.test.espresso:espresso-core", version.ref = "espresso-core" }
 junit4 = { module = "junit:junit", version.ref = "junit4" }
+firebase-database-ktx = { module = "com.google.firebase:firebase-database-ktx", version.ref = "firebase-database-ktx" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
