@@ -1,0 +1,28 @@
+{
+  "storeId": "mcdonalds_gangnam_001",
+  "optionGroups": [
+    {
+      "id": "set_size",
+      "title": "Set Size",
+      "required": true,
+      "minSelections": 1,
+      "maxSelections": 1,
+      "choices": [
+        { "id": "regular", "label": "Regular", "priceDelta": 0 },
+        { "id": "large", "label": "Large", "priceDelta": 1000 }
+      ]
+    },
+    {
+      "id": "drink_choice",
+      "title": "Drink Choice",
+      "required": true,
+      "minSelections": 1,
+      "maxSelections": 1,
+      "choices": [
+        { "id": "cola", "label": "Coke", "priceDelta": 0 },
+        { "id": "zero_cola", "label": "Coke Zero", "priceDelta": 0 },
+        { "id": "americano", "label": "Iced Americano", "priceDelta": 500 }
+      ]
+    }
+  ]
+}

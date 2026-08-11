@@ -13,9 +13,11 @@ class FakeStoreResolver : StoreResolver {
 
         return Store(
             id = "store_demo_001",
+            brandId = "hanzi-demo",
             name = "Hanzi DriveThru Demo Store",
             capabilities = setOf(StoreCapability.FULL_ORDERING, StoreCapability.QUICK_ORDER),
             menuSource = "fake-menu-repository",
+            tenantPath = "tenants/demo/store_demo_001",
         )
     }
 }

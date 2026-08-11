@@ -10,8 +10,8 @@ import com.hanzi.drivethru.core.state.DriveThruSafetyPolicy
 import com.hanzi.drivethru.core.state.OrderingSessionController
 import com.hanzi.drivethru.core.state.StopStatePolicy
 import com.hanzi.drivethru.data.entry.EntryTriggerProvider
-import com.hanzi.drivethru.data.menu.FirebaseMenuRepository
 import com.hanzi.drivethru.data.menu.MenuRepository
+import com.hanzi.drivethru.data.menu.StoreScopedMenuRepository
 import com.hanzi.drivethru.data.store.StoreResolver
 import com.hanzi.drivethru.data.vehicle.VehicleSignalProvider
 
@@ -71,6 +71,7 @@ class CustomUiFlowCoordinator(
 
     private fun activateStore(entryTriggerEvent: EntryTriggerEvent) {
         val store = storeResolver.resolveStore(entryTriggerEvent) ?: return
+        (menuRepository as? StoreScopedMenuRepository)?.activateStore(store.id)
         orderingSessionController.startSession(store)
         viewState = viewState.copy(
             destination = CustomUiDestination.STORE_READY,
@@ -228,10 +229,10 @@ class CustomUiFlowCoordinator(
     }
 
     private fun resolveFirebaseStatus(): String {
-        return if (menuRepository is FirebaseMenuRepository) {
+        return if (menuRepository is StoreScopedMenuRepository) {
             menuRepository.getSyncStatus()
         } else {
-            "Firebase repository disabled. Fake menu repository active."
+            "Menu repository status unavailable."
         }
     }
 }

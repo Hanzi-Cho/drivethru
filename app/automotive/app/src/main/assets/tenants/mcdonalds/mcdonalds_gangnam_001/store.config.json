@@ -1,0 +1,23 @@
+{
+  "brandId": "mcdonalds",
+  "storeId": "mcdonalds_gangnam_001",
+  "displayName": "McDonald's Gangnam DT",
+  "capabilities": [
+    "FULL_ORDERING",
+    "QUICK_ORDER"
+  ],
+  "menuSource": {
+    "mode": "local-first",
+    "localMenuAssetPath": "tenants/mcdonalds/mcdonalds_gangnam_001/menu.json",
+    "localOrderOptionsAssetPath": "tenants/mcdonalds/mcdonalds_gangnam_001/order-options.json",
+    "remoteMenuUrl": ""
+  },
+  "geofence": {
+    "latitude": 37.4979,
+    "longitude": 127.0276,
+    "radiusMeters": 80.0
+  },
+  "beaconIds": [
+    "beacon-mcd-001"
+  ]
+}

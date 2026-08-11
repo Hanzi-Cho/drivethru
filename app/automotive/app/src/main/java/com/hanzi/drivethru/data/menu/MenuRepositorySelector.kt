@@ -1,14 +1,15 @@
 package com.hanzi.drivethru.data.menu
 
 import android.content.Context
+import com.hanzi.drivethru.data.tenant.TenantCatalogRepository
 
 class MenuRepositorySelector(
     private val context: Context,
 ) {
-    fun select(): MenuRepository {
-        val fakeRepository = FakeMenuRepository()
-        return runCatching {
-            FirebaseMenuRepository(context, fakeRepository)
-        }.getOrDefault(fakeRepository)
+    fun select(tenantCatalogRepository: TenantCatalogRepository): StoreScopedMenuRepository {
+        return TenantMenuRepository(
+            tenantCatalogRepository = tenantCatalogRepository,
+            fallbackRepository = FakeMenuRepository(),
+        )
     }
 }

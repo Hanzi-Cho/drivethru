@@ -1,0 +1,44 @@
+{
+  "storeId": "mcdonalds_gangnam_001",
+  "items": [
+    {
+      "id": "bigmac_set",
+      "name": "Big Mac Set",
+      "price": 8900,
+      "category": "burger",
+      "available": true,
+      "description": "Classic double-patty set for drive-thru ordering.",
+      "quickOrderEligible": true,
+      "imageUrl": "https://cdn.example.com/mcdonalds/bigmac-set.png",
+      "optionGroupIds": [
+        "set_size",
+        "drink_choice"
+      ]
+    },
+    {
+      "id": "quarter_pounder_set",
+      "name": "Quarter Pounder Set",
+      "price": 9600,
+      "category": "burger",
+      "available": true,
+      "description": "Heavier premium burger combo for parked ordering.",
+      "quickOrderEligible": false,
+      "imageUrl": "https://cdn.example.com/mcdonalds/quarter-pounder.png",
+      "optionGroupIds": [
+        "set_size",
+        "drink_choice"
+      ]
+    },
+    {
+      "id": "oreo_mcflurry",
+      "name": "Oreo McFlurry",
+      "price": 3500,
+      "category": "dessert",
+      "available": true,
+      "description": "Cold dessert add-on for quick pickup orders.",
+      "quickOrderEligible": true,
+      "imageUrl": "https://cdn.example.com/mcdonalds/oreo-mcflurry.png",
+      "optionGroupIds": []
+    }
+  ]
+}

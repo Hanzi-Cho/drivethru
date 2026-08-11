@@ -8,4 +8,6 @@ data class MenuItem(
     val available: Boolean,
     val description: String,
     val quickOrderEligible: Boolean,
+    val imageUrl: String? = null,
+    val optionGroups: List<MenuOptionGroup> = emptyList(),
 )

@@ -1,0 +1,28 @@
+{
+  "storeId": "burgerking_seocho_001",
+  "optionGroups": [
+    {
+      "id": "side_choice",
+      "title": "Side Choice",
+      "required": true,
+      "minSelections": 1,
+      "maxSelections": 1,
+      "choices": [
+        { "id": "fries_r", "label": "French Fries (R)", "priceDelta": 0 },
+        { "id": "onion_rings", "label": "Onion Rings", "priceDelta": 700 }
+      ]
+    },
+    {
+      "id": "drink_choice_bk",
+      "title": "Drink",
+      "required": true,
+      "minSelections": 1,
+      "maxSelections": 1,
+      "choices": [
+        { "id": "cola_bk", "label": "Cola", "priceDelta": 0 },
+        { "id": "sprite_bk", "label": "Sprite", "priceDelta": 0 },
+        { "id": "iced_coffee_bk", "label": "Iced Coffee", "priceDelta": 800 }
+      ]
+    }
+  ]
+}

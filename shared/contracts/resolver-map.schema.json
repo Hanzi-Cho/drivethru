@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hanzi-cho.dev/drivethru/resolver-map.schema.json",
+  "title": "DriveThru Resolver Map",
+  "type": "object",
+  "required": ["stores"],
+  "properties": {
+    "stores": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["brandId", "storeId", "displayName", "tenantPath"],
+        "properties": {
+          "brandId": { "type": "string" },
+          "storeId": { "type": "string" },
+          "displayName": { "type": "string" },
+          "tenantPath": { "type": "string" },
+          "geofence": {
+            "type": "object",
+            "properties": {
+              "latitude": { "type": "number" },
+              "longitude": { "type": "number" },
+              "radiusMeters": { "type": "number" }
+            }
+          },
+          "beaconIds": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        }
+      }
+    }
+  }
+}

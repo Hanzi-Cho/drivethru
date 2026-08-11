@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hanzi-cho.dev/drivethru/menu.schema.json",
+  "title": "DriveThru Menu Catalog",
+  "type": "object",
+  "required": ["storeId", "items"],
+  "properties": {
+    "storeId": { "type": "string" },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "price", "category"],
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "price": { "type": "integer" },
+          "category": { "type": "string" },
+          "available": { "type": "boolean" },
+          "description": { "type": "string" },
+          "quickOrderEligible": { "type": "boolean" },
+          "imageUrl": { "type": "string" },
+          "optionGroupIds": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        }
+      }
+    }
+  }
+}

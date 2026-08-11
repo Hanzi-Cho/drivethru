@@ -1,0 +1,44 @@
+{
+  "storeId": "burgerking_seocho_001",
+  "items": [
+    {
+      "id": "whopper_set",
+      "name": "Whopper Set",
+      "price": 9200,
+      "category": "burger",
+      "available": true,
+      "description": "Signature flame-grilled set menu.",
+      "quickOrderEligible": true,
+      "imageUrl": "https://cdn.example.com/burgerking/whopper-set.png",
+      "optionGroupIds": [
+        "side_choice",
+        "drink_choice_bk"
+      ]
+    },
+    {
+      "id": "long_chicken_combo",
+      "name": "Long Chicken Combo",
+      "price": 8800,
+      "category": "burger",
+      "available": true,
+      "description": "Chicken sandwich combo tuned for fast pickup.",
+      "quickOrderEligible": false,
+      "imageUrl": "https://cdn.example.com/burgerking/long-chicken.png",
+      "optionGroupIds": [
+        "side_choice",
+        "drink_choice_bk"
+      ]
+    },
+    {
+      "id": "cheese_sticks",
+      "name": "Cheese Sticks",
+      "price": 3200,
+      "category": "side",
+      "available": true,
+      "description": "Side add-on for upsell testing.",
+      "quickOrderEligible": true,
+      "imageUrl": "https://cdn.example.com/burgerking/cheese-sticks.png",
+      "optionGroupIds": []
+    }
+  ]
+}

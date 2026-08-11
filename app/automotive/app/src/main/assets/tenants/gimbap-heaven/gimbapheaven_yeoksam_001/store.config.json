@@ -1,0 +1,23 @@
+{
+  "brandId": "gimbap-heaven",
+  "storeId": "gimbapheaven_yeoksam_001",
+  "displayName": "Gimbap Heaven Yeoksam Pickup",
+  "capabilities": [
+    "FULL_ORDERING",
+    "QUICK_ORDER"
+  ],
+  "menuSource": {
+    "mode": "remote-first",
+    "localMenuAssetPath": "tenants/gimbap-heaven/gimbapheaven_yeoksam_001/menu.json",
+    "localOrderOptionsAssetPath": "tenants/gimbap-heaven/gimbapheaven_yeoksam_001/order-options.json",
+    "remoteMenuUrl": "https://example.invalid/api/tenants/gimbapheaven_yeoksam_001/menu"
+  },
+  "geofence": {
+    "latitude": 37.4991,
+    "longitude": 127.0282,
+    "radiusMeters": 70.0
+  },
+  "beaconIds": [
+    "beacon-gimbap-001"
+  ]
+}

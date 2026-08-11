@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hanzi-cho.dev/drivethru/store.config.schema.json",
+  "title": "DriveThru Store Config",
+  "type": "object",
+  "required": ["brandId", "storeId", "displayName", "capabilities", "menuSource"],
+  "properties": {
+    "brandId": { "type": "string" },
+    "storeId": { "type": "string" },
+    "displayName": { "type": "string" },
+    "capabilities": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["FULL_ORDERING", "QUICK_ORDER"]
+      }
+    },
+    "menuSource": {
+      "type": "object",
+      "required": ["mode"],
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["local-first", "remote-first", "remote-only"]
+        },
+        "localMenuAssetPath": { "type": "string" },
+        "localOrderOptionsAssetPath": { "type": "string" },
+        "remoteMenuUrl": { "type": "string" }
+      }
+    },
+    "geofence": {
+      "type": "object",
+      "properties": {
+        "latitude": { "type": "number" },
+        "longitude": { "type": "number" },
+        "radiusMeters": { "type": "number" }
+      }
+    },
+    "beaconIds": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  }
+}

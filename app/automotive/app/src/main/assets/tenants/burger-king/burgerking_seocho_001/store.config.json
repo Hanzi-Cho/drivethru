@@ -1,0 +1,23 @@
+{
+  "brandId": "burger-king",
+  "storeId": "burgerking_seocho_001",
+  "displayName": "Burger King Seocho DT",
+  "capabilities": [
+    "FULL_ORDERING",
+    "QUICK_ORDER"
+  ],
+  "menuSource": {
+    "mode": "local-first",
+    "localMenuAssetPath": "tenants/burger-king/burgerking_seocho_001/menu.json",
+    "localOrderOptionsAssetPath": "tenants/burger-king/burgerking_seocho_001/order-options.json",
+    "remoteMenuUrl": ""
+  },
+  "geofence": {
+    "latitude": 37.4984,
+    "longitude": 127.0267,
+    "radiusMeters": 85.0
+  },
+  "beaconIds": [
+    "beacon-bk-001"
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "storeId": "gimbapheaven_yeoksam_001",
+  "optionGroups": [
+    {
+      "id": "extra_fillings",
+      "title": "Extra Fillings",
+      "required": false,
+      "minSelections": 0,
+      "maxSelections": 2,
+      "choices": [
+        { "id": "extra_egg", "label": "Extra Egg", "priceDelta": 500 },
+        { "id": "extra_ham", "label": "Extra Ham", "priceDelta": 700 }
+      ]
+    },
+    {
+      "id": "spice_level",
+      "title": "Spice Level",
+      "required": true,
+      "minSelections": 1,
+      "maxSelections": 1,
+      "choices": [
+        { "id": "mild", "label": "Mild", "priceDelta": 0 },
+        { "id": "regular", "label": "Regular", "priceDelta": 0 },
+        { "id": "hot", "label": "Hot", "priceDelta": 0 }
+      ]
+    }
+  ]
+}

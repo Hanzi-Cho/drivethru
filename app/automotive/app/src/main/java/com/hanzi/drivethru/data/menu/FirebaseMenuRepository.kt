@@ -14,9 +14,10 @@ import java.util.concurrent.atomic.AtomicReference
 class FirebaseMenuRepository(
     context: Context,
     private val fallback: MenuRepository,
-) : MenuRepository {
+) : StoreScopedMenuRepository {
     private val cache = AtomicReference(fallback.getAllMenuItems())
     private val status = AtomicReference("Firebase unavailable, using fake menu fallback.")
+    private var activeStoreId: String? = null
 
     init {
         tryInitialize(context)
@@ -49,7 +50,20 @@ class FirebaseMenuRepository(
 
     override fun getSeededCart(): List<SeededCartConfig> = fallback.getSeededCart()
 
-    fun getSyncStatus(): String = status.get()
+    override fun getSyncStatus(): String = status.get()
+
+    override fun activateStore(storeId: String) {
+        activeStoreId = storeId
+        val apps = FirebaseApp.getApps(contextRef)
+        if (apps.isNotEmpty()) {
+            val database = FirebaseDatabase.getInstance()
+            subscribeToMenu(database.reference.child("stores").child(storeId).child("menu"))
+        }
+    }
+
+    override fun getActiveStoreId(): String? = activeStoreId
+
+    private val contextRef = context
 
     private fun tryInitialize(context: Context) {
         val apps = FirebaseApp.getApps(context)
@@ -57,9 +71,7 @@ class FirebaseMenuRepository(
             status.set("Firebase not configured in this build. Running with fake menu data.")
             return
         }
-
-        val database = FirebaseDatabase.getInstance()
-        subscribeToMenu(database.reference.child("stores").child("store_demo_001").child("menu"))
+        status.set("Firebase configured. Waiting for active store selection.")
     }
 
     private fun subscribeToMenu(reference: DatabaseReference) {

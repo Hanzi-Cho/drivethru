@@ -3,7 +3,7 @@ package com.hanzi.drivethru.data.menu
 import com.hanzi.drivethru.core.model.MenuItem
 import com.hanzi.drivethru.core.model.MenuSection
 
-class FakeMenuRepository : MenuRepository {
+class FakeMenuRepository : StoreScopedMenuRepository {
     private val menuItems = listOf(
         MenuItem(
             id = "double_beef_burger_set",
@@ -125,4 +125,10 @@ class FakeMenuRepository : MenuRepository {
             ),
         )
     }
+
+    override fun activateStore(storeId: String) = Unit
+
+    override fun getActiveStoreId(): String? = null
+
+    override fun getSyncStatus(): String = "Fake menu repository active."
 }

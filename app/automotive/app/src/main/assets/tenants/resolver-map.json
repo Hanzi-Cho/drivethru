@@ -1,0 +1,46 @@
+{
+  "stores": [
+    {
+      "brandId": "mcdonalds",
+      "storeId": "mcdonalds_gangnam_001",
+      "displayName": "McDonald's Gangnam DT",
+      "tenantPath": "tenants/mcdonalds/mcdonalds_gangnam_001",
+      "geofence": {
+        "latitude": 37.4979,
+        "longitude": 127.0276,
+        "radiusMeters": 80.0
+      },
+      "beaconIds": [
+        "beacon-mcd-001"
+      ]
+    },
+    {
+      "brandId": "burger-king",
+      "storeId": "burgerking_seocho_001",
+      "displayName": "Burger King Seocho DT",
+      "tenantPath": "tenants/burger-king/burgerking_seocho_001",
+      "geofence": {
+        "latitude": 37.4984,
+        "longitude": 127.0267,
+        "radiusMeters": 85.0
+      },
+      "beaconIds": [
+        "beacon-bk-001"
+      ]
+    },
+    {
+      "brandId": "gimbap-heaven",
+      "storeId": "gimbapheaven_yeoksam_001",
+      "displayName": "Gimbap Heaven Yeoksam Pickup",
+      "tenantPath": "tenants/gimbap-heaven/gimbapheaven_yeoksam_001",
+      "geofence": {
+        "latitude": 37.4991,
+        "longitude": 127.0282,
+        "radiusMeters": 70.0
+      },
+      "beaconIds": [
+        "beacon-gimbap-001"
+      ]
+    }
+  ]
+}

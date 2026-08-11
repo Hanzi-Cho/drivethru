@@ -1,0 +1,42 @@
+{
+  "storeId": "gimbapheaven_yeoksam_001",
+  "items": [
+    {
+      "id": "classic_gimbap",
+      "name": "Classic Gimbap",
+      "price": 4500,
+      "category": "kimbap",
+      "available": true,
+      "description": "Default pickup-friendly gimbap roll.",
+      "quickOrderEligible": true,
+      "imageUrl": "https://cdn.example.com/gimbap/classic-gimbap.png",
+      "optionGroupIds": [
+        "extra_fillings"
+      ]
+    },
+    {
+      "id": "cheese_rabokki",
+      "name": "Cheese Rabokki",
+      "price": 7500,
+      "category": "meal",
+      "available": true,
+      "description": "Hot meal for parked browse flow.",
+      "quickOrderEligible": false,
+      "imageUrl": "https://cdn.example.com/gimbap/cheese-rabokki.png",
+      "optionGroupIds": [
+        "spice_level"
+      ]
+    },
+    {
+      "id": "fishcake_soup",
+      "name": "Fishcake Soup",
+      "price": 3900,
+      "category": "meal",
+      "available": true,
+      "description": "Simple add-on menu item.",
+      "quickOrderEligible": true,
+      "imageUrl": "https://cdn.example.com/gimbap/fishcake-soup.png",
+      "optionGroupIds": []
+    }
+  ]
+}
