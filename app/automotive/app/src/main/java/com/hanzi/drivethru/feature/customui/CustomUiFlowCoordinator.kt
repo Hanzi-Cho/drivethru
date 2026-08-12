@@ -14,6 +14,9 @@ import com.hanzi.drivethru.data.menu.MenuRepository
 import com.hanzi.drivethru.data.menu.StoreScopedMenuRepository
 import com.hanzi.drivethru.data.store.StoreResolver
 import com.hanzi.drivethru.data.vehicle.VehicleSignalProvider
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 class CustomUiFlowCoordinator(
     private val menuRepository: MenuRepository,
@@ -36,8 +39,10 @@ class CustomUiFlowCoordinator(
         statusMessage = "Waiting for a drive-thru entry event.",
         firebaseStatus = resolveFirebaseStatus(),
     )
+    private val mutableViewStateFlow = MutableStateFlow(viewState)
 
     fun getViewState(): CustomUiViewState = viewState
+    val viewStateFlow: StateFlow<CustomUiViewState> = mutableViewStateFlow.asStateFlow()
     fun getMenuItems() = menuRepository.getAllMenuItems()
     fun getCarSignalReadings() = vehicleSignalProvider.getDiagnostics()
 
@@ -46,6 +51,21 @@ class CustomUiFlowCoordinator(
             stage = stage,
             latitude = 37.4979,
             longitude = 127.0276,
+            lanePoint = lanePoint,
+        )
+        syncEntryTrigger()
+    }
+
+    fun injectGpsTrigger(
+        stage: DriveThruZoneStage,
+        latitude: Double,
+        longitude: Double,
+        lanePoint: DriveThruLanePoint? = null,
+    ) {
+        entryTriggerProvider.simulateGps(
+            stage = stage,
+            latitude = latitude,
+            longitude = longitude,
             lanePoint = lanePoint,
         )
         syncEntryTrigger()
@@ -60,9 +80,22 @@ class CustomUiFlowCoordinator(
         syncEntryTrigger()
     }
 
+    fun injectBeaconTrigger(
+        stage: DriveThruZoneStage,
+        beaconId: String,
+        lanePoint: DriveThruLanePoint? = null,
+    ) {
+        entryTriggerProvider.simulateBeacon(
+            stage = stage,
+            beaconId = beaconId,
+            lanePoint = lanePoint,
+        )
+        syncEntryTrigger()
+    }
+
     fun resetEntryTrigger() {
         entryTriggerProvider.resetToOutside()
-        closeSession()
+        closeSession(statusMessage = "Session closed. Waiting for the next entry event.")
     }
 
     fun enterDemoStore() {
@@ -73,14 +106,16 @@ class CustomUiFlowCoordinator(
         val store = storeResolver.resolveStore(entryTriggerEvent) ?: return
         (menuRepository as? StoreScopedMenuRepository)?.activateStore(store.id)
         orderingSessionController.startSession(store)
-        viewState = viewState.copy(
-            destination = CustomUiDestination.STORE_READY,
-            activeStore = store,
-            orderDraft = orderingSessionController.getActiveSession()?.orderDraft,
-            entryTriggerEvent = entryTriggerEvent,
-            stopStateReason = null,
-            statusMessage = "Store detected. Park the vehicle to open full ordering UI.",
-            firebaseStatus = resolveFirebaseStatus(),
+        publishViewState(
+            viewState.copy(
+                destination = CustomUiDestination.STORE_READY,
+                activeStore = store,
+                orderDraft = orderingSessionController.getActiveSession()?.orderDraft,
+                entryTriggerEvent = entryTriggerEvent,
+                stopStateReason = null,
+                statusMessage = "Store detected. Park the vehicle to open full ordering UI.",
+                firebaseStatus = resolveFirebaseStatus(),
+            ),
         )
         syncVehicleSignal()
     }
@@ -99,23 +134,27 @@ class CustomUiFlowCoordinator(
         val store = viewState.activeStore ?: return
         val snapshot = vehicleSignalProvider.getSnapshot()
         if (!safetyPolicy.canShowFullOrderingUi(snapshot)) {
-            viewState = viewState.copy(
-                destination = CustomUiDestination.STORE_READY,
-                vehicleSignal = snapshot,
-                statusMessage = "Full ordering is locked until the vehicle is in PARK.",
+            publishViewState(
+                viewState.copy(
+                    destination = CustomUiDestination.STORE_READY,
+                    vehicleSignal = snapshot,
+                    statusMessage = "Full ordering is locked until the vehicle is in PARK.",
+                ),
             )
             return
         }
 
         lastSafeOrderingDestination = CustomUiDestination.FULL_MENU
-        viewState = viewState.copy(
-            destination = CustomUiDestination.FULL_MENU,
-            activeStore = store,
-            vehicleSignal = snapshot,
-            stopStateReason = null,
-            orderDraft = orderingSessionController.getActiveSession()?.orderDraft,
-            statusMessage = "Full ordering UI is active.",
-            firebaseStatus = resolveFirebaseStatus(),
+        publishViewState(
+            viewState.copy(
+                destination = CustomUiDestination.FULL_MENU,
+                activeStore = store,
+                vehicleSignal = snapshot,
+                stopStateReason = null,
+                orderDraft = orderingSessionController.getActiveSession()?.orderDraft,
+                statusMessage = "Full ordering UI is active.",
+                firebaseStatus = resolveFirebaseStatus(),
+            ),
         )
     }
 
@@ -123,69 +162,82 @@ class CustomUiFlowCoordinator(
         val menuItem = menuRepository.findMenuItemById(menuItemId) ?: return
         orderingSessionController.addMenuItem(menuItem)
         lastSafeOrderingDestination = CustomUiDestination.FULL_MENU
-        viewState = viewState.copy(
-            destination = CustomUiDestination.FULL_MENU,
-            orderDraft = orderingSessionController.getActiveSession()?.orderDraft,
-            statusMessage = "${menuItem.name} added to the draft.",
-            firebaseStatus = resolveFirebaseStatus(),
+        publishViewState(
+            viewState.copy(
+                destination = CustomUiDestination.FULL_MENU,
+                orderDraft = orderingSessionController.getActiveSession()?.orderDraft,
+                statusMessage = "${menuItem.name} added to the draft.",
+                firebaseStatus = resolveFirebaseStatus(),
+            ),
         )
     }
 
     fun openCartReview() {
         if (!orderingSessionController.hasActiveDraft()) {
-            viewState = viewState.copy(
-                statusMessage = "Add at least one menu item before reviewing the cart.",
+            publishViewState(
+                viewState.copy(
+                    statusMessage = "Add at least one menu item before reviewing the cart.",
+                ),
             )
             return
         }
 
         lastSafeOrderingDestination = CustomUiDestination.CART_REVIEW
-        viewState = viewState.copy(
-            destination = CustomUiDestination.CART_REVIEW,
-            orderDraft = orderingSessionController.getActiveSession()?.orderDraft,
-            statusMessage = "Review the current draft before proceeding.",
-            firebaseStatus = resolveFirebaseStatus(),
+        publishViewState(
+            viewState.copy(
+                destination = CustomUiDestination.CART_REVIEW,
+                orderDraft = orderingSessionController.getActiveSession()?.orderDraft,
+                statusMessage = "Review the current draft before proceeding.",
+                firebaseStatus = resolveFirebaseStatus(),
+            ),
         )
     }
 
     fun resumeOrdering() {
         val snapshot = vehicleSignalProvider.getSnapshot()
         if (!safetyPolicy.canShowFullOrderingUi(snapshot)) {
-            viewState = viewState.copy(
-                destination = CustomUiDestination.STOP_STATE,
-                vehicleSignal = snapshot,
-                statusMessage = "The vehicle is still not safe to resume ordering.",
+            publishViewState(
+                viewState.copy(
+                    destination = CustomUiDestination.STOP_STATE,
+                    vehicleSignal = snapshot,
+                    statusMessage = "The vehicle is still not safe to resume ordering.",
+                ),
             )
             return
         }
 
-        viewState = viewState.copy(
-            destination = lastSafeOrderingDestination,
-            vehicleSignal = snapshot,
-            stopStateReason = null,
-            orderDraft = orderingSessionController.getActiveSession()?.orderDraft,
-            statusMessage = "Vehicle returned to a safe state. Ordering resumed.",
-            firebaseStatus = resolveFirebaseStatus(),
+        publishViewState(
+            viewState.copy(
+                destination = lastSafeOrderingDestination,
+                vehicleSignal = snapshot,
+                stopStateReason = null,
+                orderDraft = orderingSessionController.getActiveSession()?.orderDraft,
+                statusMessage = "Vehicle returned to a safe state. Ordering resumed.",
+                firebaseStatus = resolveFirebaseStatus(),
+            ),
         )
     }
 
-    fun closeSession() {
+    fun closeSession(statusMessage: String = "Session closed. Waiting for the next entry event.") {
         orderingSessionController.clearSession()
-        viewState = viewState.copy(
-            destination = CustomUiDestination.STANDBY,
-            activeStore = null,
-            orderDraft = null,
-            entryTriggerEvent = entryTriggerProvider.currentEvent(),
-            stopStateReason = null,
-            statusMessage = "Session closed. Waiting for the next entry event.",
-            firebaseStatus = resolveFirebaseStatus(),
+        publishViewState(
+            viewState.copy(
+                destination = CustomUiDestination.STANDBY,
+                activeStore = null,
+                orderDraft = null,
+                entryTriggerEvent = entryTriggerProvider.currentEvent(),
+                stopStateReason = null,
+                statusMessage = statusMessage,
+                firebaseStatus = resolveFirebaseStatus(),
+            ),
         )
     }
 
     private fun syncEntryTrigger() {
         val event = entryTriggerProvider.currentEvent()
         if (event.stage == DriveThruZoneStage.OUTSIDE || event.stage == DriveThruZoneStage.EXIT) {
-            closeSession()
+            entryTriggerProvider.resetToOutside()
+            closeSession(statusMessage = "Vehicle left the store zone. Returning to standby.")
             return
         }
 
@@ -194,38 +246,47 @@ class CustomUiFlowCoordinator(
 
     private fun syncVehicleSignal() {
         val snapshot = vehicleSignalProvider.getSnapshot()
+        if (viewState.activeStore != null && safetyPolicy.shouldAbortOrderingSession(snapshot)) {
+            entryTriggerProvider.resetToOutside()
+            closeSession(
+                statusMessage = "Vehicle exceeded the safety speed threshold. Session closed and UI returned to standby.",
+            )
+            return
+        }
         val stopStateReason = stopStatePolicy.evaluateTransition(viewState.destination, snapshot)
 
-        viewState = if (stopStateReason != null) {
-            viewState.copy(
-                destination = CustomUiDestination.STOP_STATE,
-                vehicleSignal = snapshot,
-                orderDraft = orderingSessionController.getActiveSession()?.orderDraft,
-                entryTriggerEvent = entryTriggerProvider.currentEvent(),
-                stopStateReason = stopStateReason,
-                statusMessage = "Vehicle safety guard engaged. Resume only after returning to PARK.",
-                firebaseStatus = resolveFirebaseStatus(),
-            )
-        } else {
-            val nextDestination = when {
-                viewState.destination == CustomUiDestination.STORE_READY &&
-                    safetyPolicy.canShowFullOrderingUi(snapshot) -> CustomUiDestination.FULL_MENU
-                else -> viewState.destination
-            }
-            viewState.copy(
-                destination = nextDestination,
-                vehicleSignal = snapshot,
-                orderDraft = orderingSessionController.getActiveSession()?.orderDraft,
-                entryTriggerEvent = entryTriggerProvider.currentEvent(),
-                stopStateReason = null,
-                statusMessage = when (nextDestination) {
-                    CustomUiDestination.FULL_MENU ->
-                        "Safe state confirmed. Full ordering UI is available."
-                    else -> viewState.statusMessage
-                },
-                firebaseStatus = resolveFirebaseStatus(),
-            )
-        }
+        publishViewState(
+            if (stopStateReason != null) {
+                viewState.copy(
+                    destination = CustomUiDestination.STOP_STATE,
+                    vehicleSignal = snapshot,
+                    orderDraft = orderingSessionController.getActiveSession()?.orderDraft,
+                    entryTriggerEvent = entryTriggerProvider.currentEvent(),
+                    stopStateReason = stopStateReason,
+                    statusMessage = "Vehicle safety guard engaged. Resume only after returning to PARK.",
+                    firebaseStatus = resolveFirebaseStatus(),
+                )
+            } else {
+                val nextDestination = when {
+                    viewState.destination == CustomUiDestination.STORE_READY &&
+                        safetyPolicy.canShowFullOrderingUi(snapshot) -> CustomUiDestination.FULL_MENU
+                    else -> viewState.destination
+                }
+                viewState.copy(
+                    destination = nextDestination,
+                    vehicleSignal = snapshot,
+                    orderDraft = orderingSessionController.getActiveSession()?.orderDraft,
+                    entryTriggerEvent = entryTriggerProvider.currentEvent(),
+                    stopStateReason = null,
+                    statusMessage = when (nextDestination) {
+                        CustomUiDestination.FULL_MENU ->
+                            "Safe state confirmed. Full ordering UI is available."
+                        else -> viewState.statusMessage
+                    },
+                    firebaseStatus = resolveFirebaseStatus(),
+                )
+            },
+        )
     }
 
     private fun resolveFirebaseStatus(): String {
@@ -234,5 +295,10 @@ class CustomUiFlowCoordinator(
         } else {
             "Menu repository status unavailable."
         }
+    }
+
+    private fun publishViewState(nextState: CustomUiViewState) {
+        viewState = nextState
+        mutableViewStateFlow.value = nextState
     }
 }

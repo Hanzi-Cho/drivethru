@@ -52,5 +52,14 @@
             android:exported="true"
             android:label="@string/app_name"
             android:theme="@android:style/Theme.DeviceDefault.NoActionBar" />
+
+        <receiver
+            android:name=".debug.DriveThruDebugInjectReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.hanzi.drivethru.action.INJECT_DEBUG_EVENT" />
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>

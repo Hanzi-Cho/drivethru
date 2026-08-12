@@ -1,11 +1,1 @@
-$ErrorActionPreference = "Stop"
-
-Write-Host "[DriveThru] Injecting PARK gear event through VHAL..."
-$result = cmd /c "adb shell cmd car_service inject-vhal-event 0x11400400 4 2>&1"
-$resultText = ($result | Out-String).Trim()
-
-if ($resultText -match "requires non-user build") {
-    Write-Warning "The current emulator image blocks VHAL injection on user builds. Keep using the in-app fake gear toggle until a userdebug-capable image is available."
-} elseif ($resultText) {
-    Write-Host $resultText
-}
+powershell -NoProfile -ExecutionPolicy Bypass -File "$PSScriptRoot\inject-debug-event.ps1" -Source vehicle -Gear PARK -Parking $true -SpeedMps 0.0

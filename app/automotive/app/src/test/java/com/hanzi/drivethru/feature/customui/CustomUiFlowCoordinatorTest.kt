@@ -12,6 +12,7 @@ import com.hanzi.drivethru.data.menu.FakeMenuRepository
 import com.hanzi.drivethru.data.store.FakeStoreResolver
 import com.hanzi.drivethru.data.vehicle.FakeVehicleSignalProvider
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -77,5 +78,20 @@ class CustomUiFlowCoordinatorTest {
         coordinator.resetEntryTrigger()
 
         assertEquals(CustomUiDestination.STANDBY, coordinator.getViewState().destination)
+    }
+
+    @Test
+    fun `high speed abort closes session and resets store context`() {
+        val coordinator = createCoordinator()
+
+        coordinator.setGearState(GearState.PARK)
+        coordinator.simulateGpsTrigger(DriveThruZoneStage.ORDERING_READY, DriveThruLanePoint.MENU_BOARD)
+        coordinator.addMenuItem("double_beef_burger_set")
+        coordinator.setVehicleSpeed(8.2)
+
+        val state = coordinator.getViewState()
+        assertEquals(CustomUiDestination.STANDBY, state.destination)
+        assertNull(state.activeStore)
+        assertTrue(state.statusMessage.contains("speed threshold"))
     }
 }

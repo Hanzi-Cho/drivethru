@@ -5,11 +5,11 @@ import androidx.car.app.CarAppService
 import androidx.car.app.Session
 import androidx.car.app.SessionInfo
 import androidx.car.app.validation.HostValidator
-import com.hanzi.drivethru.di.AppContainer
+import com.hanzi.drivethru.di.DriveThruRuntime
 
 class DriveThruCarAppService : CarAppService() {
     override fun onCreateSession(sessionInfo: SessionInfo): Session {
-        return DriveThruSession(AppContainer(applicationContext).stateStore)
+        return DriveThruSession(DriveThruRuntime.get(applicationContext).stateStore)
     }
 
     override fun createHostValidator(): HostValidator {

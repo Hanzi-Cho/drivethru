@@ -5,8 +5,16 @@ import com.hanzi.drivethru.core.model.StopStateReason
 import com.hanzi.drivethru.core.model.VehicleSignalSnapshot
 
 class DriveThruSafetyPolicy {
+    companion object {
+        const val SESSION_ABORT_SPEED_METERS_PER_SECOND = 8.0
+    }
+
     fun canShowFullOrderingUi(snapshot: VehicleSignalSnapshot): Boolean {
         return snapshot.gearState == GearState.PARK
+    }
+
+    fun shouldAbortOrderingSession(snapshot: VehicleSignalSnapshot): Boolean {
+        return snapshot.speedMetersPerSecond >= SESSION_ABORT_SPEED_METERS_PER_SECOND
     }
 
     fun determineStopStateReason(snapshot: VehicleSignalSnapshot): StopStateReason? {

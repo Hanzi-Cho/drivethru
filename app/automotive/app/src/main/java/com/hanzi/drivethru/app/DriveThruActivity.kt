@@ -27,9 +27,10 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -47,14 +48,14 @@ import com.hanzi.drivethru.core.model.DriveThruZoneStage
 import com.hanzi.drivethru.core.model.GearState
 import com.hanzi.drivethru.core.model.MenuItem
 import com.hanzi.drivethru.core.model.StopStateReason
-import com.hanzi.drivethru.di.AppContainer
+import com.hanzi.drivethru.di.DriveThruRuntime
 import com.hanzi.drivethru.feature.customui.CustomUiFlowCoordinator
 
 class DriveThruActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val container = AppContainer(applicationContext)
+        val container = DriveThruRuntime.get(applicationContext)
         setContent {
             MaterialTheme {
                 Surface(color = Color(0xFF0E1318)) {
@@ -84,12 +85,8 @@ private fun DriveThruCustomUiApp(
     coordinator: CustomUiFlowCoordinator,
     onLaunchTemplateApp: () -> Unit,
 ) {
-    var viewState by remember { mutableStateOf(coordinator.getViewState()) }
+    val viewState by coordinator.viewStateFlow.collectAsState()
     var uiMode by remember { mutableStateOf(DriveThruUiMode.ENHANCED_CUSTOM) }
-
-    fun refreshState() {
-        viewState = coordinator.getViewState()
-    }
 
     val menuItems = coordinator.getMenuItems()
     val diagnostics = coordinator.getCarSignalReadings()
@@ -112,36 +109,28 @@ private fun DriveThruCustomUiApp(
             DebugControlPanel(
                 onGpsApproaching = {
                     coordinator.simulateGpsTrigger(DriveThruZoneStage.APPROACHING, DriveThruLanePoint.ENTRANCE)
-                    refreshState()
                 },
                 onGpsReady = {
                     coordinator.simulateGpsTrigger(DriveThruZoneStage.ORDERING_READY, DriveThruLanePoint.MENU_BOARD)
-                    refreshState()
                 },
                 onBeaconReady = {
                     coordinator.simulateBeaconTrigger(DriveThruZoneStage.ORDERING_READY, DriveThruLanePoint.MENU_BOARD)
-                    refreshState()
                 },
                 onExitZone = {
                     coordinator.resetEntryTrigger()
-                    refreshState()
                 },
                 onSetPark = {
                     coordinator.setGearState(GearState.PARK)
                     coordinator.setVehicleSpeed(0.0)
-                    refreshState()
                 },
                 onSetDrive = {
                     coordinator.setGearState(GearState.DRIVE)
-                    refreshState()
                 },
                 onSetStopped = {
                     coordinator.setVehicleSpeed(0.0)
-                    refreshState()
                 },
                 onSetMoving = {
                     coordinator.setVehicleSpeed(3.5)
-                    refreshState()
                 },
             )
             Spacer(modifier = Modifier.height(14.dp))
@@ -153,13 +142,11 @@ private fun DriveThruCustomUiApp(
                     viewState = viewState,
                     menuItems = menuItems,
                     coordinator = coordinator,
-                    refreshState = ::refreshState,
                 )
                 DriveThruUiMode.ENHANCED_CUSTOM -> EnhancedScreen(
                     viewState = viewState,
                     menuItems = menuItems,
                     coordinator = coordinator,
-                    refreshState = ::refreshState,
                 )
             }
         }
@@ -331,11 +318,10 @@ private fun ClassicScreen(
     viewState: CustomUiViewState,
     menuItems: List<MenuItem>,
     coordinator: CustomUiFlowCoordinator,
-    refreshState: () -> Unit,
 ) {
     when (viewState.destination) {
         CustomUiDestination.STANDBY -> {
-            InfoPanel("Standby", "Waiting for a simulated GPS or beacon trigger.")
+            InfoPanel("Standby", "Waiting for GPS geofence, beacon, or adb inject input.")
         }
 
         CustomUiDestination.STORE_READY -> {
@@ -345,20 +331,19 @@ private fun ClassicScreen(
                 primaryAction = "Open full menu",
             ) {
                 coordinator.openFullMenu()
-                refreshState()
             }
         }
 
         CustomUiDestination.FULL_MENU -> {
-            ClassicMenuPanel(viewState, menuItems, coordinator, refreshState)
+            ClassicMenuPanel(viewState, menuItems, coordinator)
         }
 
         CustomUiDestination.CART_REVIEW -> {
-            CartReviewPanel(viewState, coordinator, refreshState)
+            CartReviewPanel(viewState, coordinator)
         }
 
         CustomUiDestination.STOP_STATE -> {
-            StopStatePanel(viewState.stopStateReason, viewState.orderDraft?.items?.sumOf { it.quantity } ?: 0, coordinator, refreshState)
+            StopStatePanel(viewState.stopStateReason, viewState.orderDraft?.items?.sumOf { it.quantity } ?: 0, coordinator)
         }
     }
 }
@@ -368,10 +353,9 @@ private fun EnhancedScreen(
     viewState: CustomUiViewState,
     menuItems: List<MenuItem>,
     coordinator: CustomUiFlowCoordinator,
-    refreshState: () -> Unit,
 ) {
     if (viewState.destination == CustomUiDestination.STANDBY || viewState.destination == CustomUiDestination.STORE_READY) {
-        ClassicScreen(viewState, menuItems, coordinator, refreshState)
+        ClassicScreen(viewState, menuItems, coordinator)
         return
     }
 
@@ -397,13 +381,11 @@ private fun EnhancedScreen(
                 viewState = viewState,
                 menuItems = menuItems,
                 coordinator = coordinator,
-                refreshState = refreshState,
                 modifier = Modifier.weight(1.6f),
             )
             EnhancedSummaryPanel(
                 viewState = viewState,
                 coordinator = coordinator,
-                refreshState = refreshState,
                 modifier = Modifier.weight(1f),
             )
         }
@@ -447,11 +429,10 @@ private fun EnhancedMenuPanel(
     viewState: CustomUiViewState,
     menuItems: List<MenuItem>,
     coordinator: CustomUiFlowCoordinator,
-    refreshState: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     if (viewState.destination == CustomUiDestination.STOP_STATE) {
-        StopStatePanel(viewState.stopStateReason, viewState.orderDraft?.items?.sumOf { it.quantity } ?: 0, coordinator, refreshState)
+        StopStatePanel(viewState.stopStateReason, viewState.orderDraft?.items?.sumOf { it.quantity } ?: 0, coordinator)
         return
     }
 
@@ -482,7 +463,6 @@ private fun EnhancedMenuPanel(
                             }
                             Button(onClick = {
                                 coordinator.addMenuItem(item.id)
-                                refreshState()
                             }) {
                                 Text("Add")
                             }
@@ -498,7 +478,6 @@ private fun EnhancedMenuPanel(
 private fun EnhancedSummaryPanel(
     viewState: CustomUiViewState,
     coordinator: CustomUiFlowCoordinator,
-    refreshState: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Card(
@@ -528,7 +507,6 @@ private fun EnhancedSummaryPanel(
             Button(
                 onClick = {
                     coordinator.openCartReview()
-                    refreshState()
                 },
                 modifier = Modifier.fillMaxWidth(),
             ) {
@@ -537,7 +515,6 @@ private fun EnhancedSummaryPanel(
             OutlinedButton(
                 onClick = {
                     coordinator.resumeOrdering()
-                    refreshState()
                 },
                 modifier = Modifier.fillMaxWidth(),
             ) {
@@ -546,7 +523,6 @@ private fun EnhancedSummaryPanel(
             OutlinedButton(
                 onClick = {
                     coordinator.closeSession()
-                    refreshState()
                 },
                 modifier = Modifier.fillMaxWidth(),
             ) {
@@ -584,7 +560,6 @@ private fun ClassicMenuPanel(
     viewState: CustomUiViewState,
     menuItems: List<MenuItem>,
     coordinator: CustomUiFlowCoordinator,
-    refreshState: () -> Unit,
 ) {
     Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF171E24)), modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.padding(20.dp)) {
@@ -599,7 +574,6 @@ private fun ClassicMenuPanel(
                 }
                 Button(onClick = {
                     coordinator.openCartReview()
-                    refreshState()
                 }) {
                     Text("Review cart (${viewState.orderDraft?.items?.sumOf { it.quantity } ?: 0})")
                 }
@@ -623,7 +597,6 @@ private fun ClassicMenuPanel(
                             Spacer(modifier = Modifier.width(12.dp))
                             Button(onClick = {
                                 coordinator.addMenuItem(item.id)
-                                refreshState()
                             }) {
                                 Text("Add")
                             }
@@ -639,7 +612,6 @@ private fun ClassicMenuPanel(
 private fun CartReviewPanel(
     viewState: CustomUiViewState,
     coordinator: CustomUiFlowCoordinator,
-    refreshState: () -> Unit,
 ) {
     val draft = viewState.orderDraft
     Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF171E24)), modifier = Modifier.fillMaxWidth()) {
@@ -656,11 +628,9 @@ private fun CartReviewPanel(
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Button(onClick = {
                     coordinator.resumeOrdering()
-                    refreshState()
                 }) { Text("Back to ordering") }
                 OutlinedButton(onClick = {
                     coordinator.closeSession()
-                    refreshState()
                 }) { Text("Close session") }
             }
         }
@@ -672,7 +642,6 @@ private fun StopStatePanel(
     stopStateReason: StopStateReason?,
     draftItemCount: Int,
     coordinator: CustomUiFlowCoordinator,
-    refreshState: () -> Unit,
 ) {
     Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF2A1717)), modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(24.dp)) {
@@ -680,16 +649,14 @@ private fun StopStatePanel(
             Spacer(modifier = Modifier.height(10.dp))
             Text("Reason: ${stopStateReason?.name ?: "UNKNOWN"}", color = Color(0xFFFFE2A8))
             Spacer(modifier = Modifier.height(8.dp))
-            Text("The draft is preserved with $draftItemCount item(s). Return to PARK, then choose to continue.", color = Color.White)
+            Text("The draft is preserved with $draftItemCount item(s). Return to PARK to continue, or accelerate/exit to close the session.", color = Color.White)
             Spacer(modifier = Modifier.height(16.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Button(onClick = {
                     coordinator.resumeOrdering()
-                    refreshState()
                 }) { Text("Continue ordering") }
                 OutlinedButton(onClick = {
                     coordinator.closeSession()
-                    refreshState()
                 }) { Text("Close session") }
             }
         }
