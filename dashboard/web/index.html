@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DriveThru Zone Simulator</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <main class="app-shell">
+    <section class="hero">
+      <p class="eyebrow">DriveThru IVI Demo</p>
+      <h1>Zone Simulator Bridge</h1>
+      <p class="hero-copy">
+        AAOS 앱이 이해하는 GPS, beacon, gear, speed 이벤트를 브라우저에서 시나리오 단위로 생성합니다.
+      </p>
+    </section>
+
+    <section class="layout-grid">
+      <article class="panel control-panel">
+        <h2>Scenario Controls</h2>
+        <p class="panel-copy">왼쪽 시뮬레이터에서 동작을 고르면 오른쪽에 inject payload와 adb 명령이 갱신됩니다.</p>
+
+        <div class="button-grid">
+          <button data-scenario="approach">GPS Approach</button>
+          <button data-scenario="ready">GPS Menu Board</button>
+          <button data-scenario="beacon">Beacon Ready</button>
+          <button data-scenario="exit">Exit Zone</button>
+          <button data-scenario="park">PARK + Stop</button>
+          <button data-scenario="drive">DRIVE</button>
+          <button data-scenario="highSpeed">High Speed Abort</button>
+        </div>
+
+        <div class="lane-map">
+          <div class="lane-point entrance" data-scenario="approach">Entrance</div>
+          <div class="lane-point menu-board" data-scenario="ready">Menu Board</div>
+          <div class="lane-point beacon" data-scenario="beacon">Beacon</div>
+          <div class="lane-point exit" data-scenario="exit">Exit</div>
+          <div class="car-marker" id="carMarker">CAR</div>
+        </div>
+      </article>
+
+      <article class="panel output-panel">
+        <h2>Bridge Output</h2>
+
+        <div class="output-block">
+          <h3>Payload</h3>
+          <pre id="payloadOutput"></pre>
+        </div>
+
+        <div class="output-block">
+          <h3>ADB Broadcast</h3>
+          <pre id="adbOutput"></pre>
+        </div>
+
+        <div class="output-block">
+          <h3>Emulator Geo Fix</h3>
+          <pre id="geoOutput"></pre>
+        </div>
+
+        <div class="output-block">
+          <h3>Validation Notes</h3>
+          <ul id="validationList" class="validation-list"></ul>
+        </div>
+      </article>
+    </section>
+  </main>
+
+  <script src="./app.js"></script>
+</body>
+</html>
