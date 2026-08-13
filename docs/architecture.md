@@ -31,6 +31,10 @@ car/drivethru/
   docs/
     project-plan.md
     architecture.md
+    architecture/
+      shell-to-vhal-command-flow.md
+    references/
+      vhal-car-service-data-sources.md
   app/
     automotive/
       app/
@@ -49,6 +53,12 @@ car/drivethru/
       inject-gear-park.ps1
       inject-gear-drive.ps1
 ```
+
+추가 문서 경로:
+- `docs/references/`
+  - VHAL, CarService, CAN, Mock 서버, 시뮬레이션 데이터 소스 정리
+- `docs/architecture/`
+  - `adb shell`, Binder IPC, CarService, VHAL 이벤트 주입 흐름처럼 개별 아키텍처 주제를 분리 기록
 
 ## 3. Android 앱 내부 구조
 
@@ -280,6 +290,35 @@ DriveThru App
 4. custom manager / custom service 도입
 5. 외부 ECU simulator 연결
 6. permission / SELinux / test 체계 보강
+
+## 6.3 VHAL / CarService 데이터 소스와 테스트 입력 경로
+
+차량 플랫폼 레이어를 실제로 검증하려면 "어디서 데이터를 가져올 것인가"를 구조적으로 정리해야 한다.
+
+권장 입력 소스는 아래 3단계로 나눈다.
+
+1. AOSP 내장 Mock / Emulator 입력
+- `FakeVehicleHal`, `DefaultConfig`, `adb shell cmd car_service inject-vhal-event ...`
+- 장점:
+  - 가장 빠르게 시작 가능
+  - 표준 VehicleProperty 기반 검증 가능
+  - 앱 / CarPropertyManager / CarService 경계를 같이 설명하기 좋음
+
+2. Standalone Mock VHAL / Linux 기반 Stub
+- 별도 Linux 호스트에서 VHAL Stub 또는 Mock 서버를 띄워 CarService 또는 테스트 클라이언트와 연결
+- 장점:
+  - Android 전체 이미지 빌드 전에도 HAL 계층 실험 가능
+  - SocketCAN, replay 입력, custom vendor property 실험이 쉬움
+
+3. 실차 / 오픈 CAN 데이터셋
+- 실제 주행에서 수집된 CAN 로그, DBC, OBD 기반 스트림을 VehicleProperty 변환 입력으로 사용
+- 장점:
+  - Fake VHAL 수준을 넘어 실차 신호 매핑 논리를 증명 가능
+  - `CAN -> parser -> VHAL -> CarService -> App` 전체 파이프라인 설명 가능
+
+문서 분리:
+- 데이터 소스 목록과 활용 포인트는 [vhal-car-service-data-sources.md](/D:/agentproject/car/drivethru/docs/references/vhal-car-service-data-sources.md)에 정리
+- `adb shell -> cmd -> system_server -> CarService -> VHAL` 흐름은 [shell-to-vhal-command-flow.md](/D:/agentproject/car/drivethru/docs/architecture/shell-to-vhal-command-flow.md)에 정리
 
 ## 7. 소프트 실시간 기능 정의
 
