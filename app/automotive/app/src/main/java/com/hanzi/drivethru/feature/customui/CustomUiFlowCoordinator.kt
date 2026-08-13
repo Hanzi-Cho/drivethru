@@ -14,9 +14,14 @@ import com.hanzi.drivethru.data.menu.MenuRepository
 import com.hanzi.drivethru.data.menu.StoreScopedMenuRepository
 import com.hanzi.drivethru.data.store.StoreResolver
 import com.hanzi.drivethru.data.vehicle.VehicleSignalProvider
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 
 class CustomUiFlowCoordinator(
     private val menuRepository: MenuRepository,
@@ -27,7 +32,9 @@ class CustomUiFlowCoordinator(
     private val safetyPolicy: DriveThruSafetyPolicy,
     private val stopStatePolicy: StopStatePolicy,
 ) {
+    private val scope = CoroutineScope(Dispatchers.Default)
     private var lastSafeOrderingDestination: CustomUiDestination = CustomUiDestination.FULL_MENU
+    private var entryEventJob: Job? = null
 
     private var viewState: CustomUiViewState = CustomUiViewState(
         destination = CustomUiDestination.STANDBY,
@@ -45,6 +52,10 @@ class CustomUiFlowCoordinator(
     val viewStateFlow: StateFlow<CustomUiViewState> = mutableViewStateFlow.asStateFlow()
     fun getMenuItems() = menuRepository.getAllMenuItems()
     fun getCarSignalReadings() = vehicleSignalProvider.getDiagnostics()
+
+    init {
+        observeEntryEvents()
+    }
 
     fun simulateGpsTrigger(stage: DriveThruZoneStage, lanePoint: DriveThruLanePoint?) {
         entryTriggerProvider.simulateGps(
@@ -233,6 +244,11 @@ class CustomUiFlowCoordinator(
         )
     }
 
+    fun restartEntryProviders() {
+        entryTriggerProvider.stop()
+        entryTriggerProvider.start()
+    }
+
     private fun syncEntryTrigger() {
         val event = entryTriggerProvider.currentEvent()
         if (event.stage == DriveThruZoneStage.OUTSIDE || event.stage == DriveThruZoneStage.EXIT) {
@@ -295,6 +311,18 @@ class CustomUiFlowCoordinator(
         } else {
             "Menu repository status unavailable."
         }
+    }
+
+    private fun observeEntryEvents() {
+        entryEventJob?.cancel()
+        entryEventJob = scope.launch {
+            entryTriggerProvider.eventFlow.collectLatest { event ->
+                if (event != viewState.entryTriggerEvent) {
+                    syncEntryTrigger()
+                }
+            }
+        }
+        entryTriggerProvider.start()
     }
 
     private fun publishViewState(nextState: CustomUiViewState) {

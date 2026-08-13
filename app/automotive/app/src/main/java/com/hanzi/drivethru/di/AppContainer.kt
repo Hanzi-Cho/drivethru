@@ -5,7 +5,10 @@ import com.hanzi.drivethru.core.state.DriveThruStateStore
 import com.hanzi.drivethru.core.state.DriveThruSafetyPolicy
 import com.hanzi.drivethru.core.state.OrderingSessionController
 import com.hanzi.drivethru.core.state.StopStatePolicy
-import com.hanzi.drivethru.data.entry.FakeEntryTriggerProvider
+import com.hanzi.drivethru.data.entry.AndroidGeofenceEntryTriggerProvider
+import com.hanzi.drivethru.data.entry.BleBeaconEntryTriggerProvider
+import com.hanzi.drivethru.data.entry.CompositeEntryTriggerProvider
+import com.hanzi.drivethru.data.entry.EntryTriggerProvider
 import com.hanzi.drivethru.data.menu.MenuRepositorySelector
 import com.hanzi.drivethru.data.payment.FakePaymentMethodRepository
 import com.hanzi.drivethru.data.settings.FakeSettingsRepository
@@ -19,6 +22,7 @@ import com.hanzi.drivethru.data.vehicle.SafeCarDataFacade
 import com.hanzi.drivethru.feature.customui.CustomUiFlowCoordinator
 
 class AppContainer(context: Context) {
+    private val appContext = context.applicationContext
     private val tenantCatalogRepository = TenantCatalogRepository(context)
     private val menuRepository = MenuRepositorySelector(context).select(tenantCatalogRepository)
     private val paymentMethodRepository = FakePaymentMethodRepository()
@@ -33,7 +37,12 @@ class AppContainer(context: Context) {
         carDataFacade = carDataFacade,
         fakeCarDataFacade = fakeCarDataFacade,
     )
-    private val entryTriggerProvider = FakeEntryTriggerProvider()
+    private val entryTriggerProvider: EntryTriggerProvider = CompositeEntryTriggerProvider(
+        providers = listOf(
+            AndroidGeofenceEntryTriggerProvider(appContext),
+            BleBeaconEntryTriggerProvider(appContext),
+        ),
+    )
     private val storeResolver = TenantStoreResolver(tenantCatalogRepository)
     private val safetyPolicy = DriveThruSafetyPolicy()
     private val stopStatePolicy = StopStatePolicy(safetyPolicy)
@@ -55,4 +64,12 @@ class AppContainer(context: Context) {
         safetyPolicy = safetyPolicy,
         stopStatePolicy = stopStatePolicy,
     )
+
+    fun startRuntime() {
+        entryTriggerProvider.start()
+    }
+
+    fun stopRuntime() {
+        entryTriggerProvider.stop()
+    }
 }

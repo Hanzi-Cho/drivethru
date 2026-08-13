@@ -1,9 +1,12 @@
 package com.hanzi.drivethru.app
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -32,6 +35,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.core.content.ContextCompat
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -56,6 +60,24 @@ class DriveThruActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         val container = DriveThruRuntime.get(applicationContext)
+        val permissionLauncher = registerForActivityResult(
+            ActivityResultContracts.RequestMultiplePermissions(),
+        ) {
+            container.startRuntime()
+            container.customUiFlowCoordinator.restartEntryProviders()
+        }
+        if (!hasRuntimeSensorPermissions()) {
+            permissionLauncher.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION,
+                    Manifest.permission.BLUETOOTH_SCAN,
+                    Manifest.permission.BLUETOOTH_CONNECT,
+                ),
+            )
+        } else {
+            container.startRuntime()
+        }
         setContent {
             MaterialTheme {
                 Surface(color = Color(0xFF0E1318)) {
@@ -68,6 +90,11 @@ class DriveThruActivity : ComponentActivity() {
         }
     }
 
+    override fun onDestroy() {
+        DriveThruRuntime.get(applicationContext).stopRuntime()
+        super.onDestroy()
+    }
+
     private fun launchTemplateApp() {
         runCatching {
             startActivity(
@@ -76,6 +103,18 @@ class DriveThruActivity : ComponentActivity() {
                     "androidx.car.app.activity.CarAppActivity",
                 ),
             )
+        }
+    }
+
+    private fun hasRuntimeSensorPermissions(): Boolean {
+        val permissions = listOf(
+            Manifest.permission.ACCESS_FINE_LOCATION,
+            Manifest.permission.ACCESS_COARSE_LOCATION,
+            Manifest.permission.BLUETOOTH_SCAN,
+            Manifest.permission.BLUETOOTH_CONNECT,
+        )
+        return permissions.all { permission ->
+            ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
         }
     }
 }

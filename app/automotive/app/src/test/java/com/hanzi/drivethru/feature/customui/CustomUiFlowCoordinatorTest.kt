@@ -11,6 +11,8 @@ import com.hanzi.drivethru.data.entry.FakeEntryTriggerProvider
 import com.hanzi.drivethru.data.menu.FakeMenuRepository
 import com.hanzi.drivethru.data.store.FakeStoreResolver
 import com.hanzi.drivethru.data.vehicle.FakeVehicleSignalProvider
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -93,5 +95,31 @@ class CustomUiFlowCoordinatorTest {
         assertEquals(CustomUiDestination.STANDBY, state.destination)
         assertNull(state.activeStore)
         assertTrue(state.statusMessage.contains("speed threshold"))
+    }
+
+    @Test
+    fun `provider event flow can activate store without manual sync call`() = runBlocking {
+        val provider = FakeEntryTriggerProvider()
+        val safetyPolicy = DriveThruSafetyPolicy()
+        val coordinator = CustomUiFlowCoordinator(
+            menuRepository = FakeMenuRepository(),
+            vehicleSignalProvider = FakeVehicleSignalProvider(),
+            entryTriggerProvider = provider,
+            storeResolver = FakeStoreResolver(),
+            orderingSessionController = OrderingSessionController(),
+            safetyPolicy = safetyPolicy,
+            stopStatePolicy = StopStatePolicy(safetyPolicy),
+        )
+
+        coordinator.setGearState(GearState.PARK)
+        provider.simulateGps(
+            stage = DriveThruZoneStage.ORDERING_READY,
+            latitude = 37.4979,
+            longitude = 127.0276,
+            lanePoint = DriveThruLanePoint.MENU_BOARD,
+        )
+        delay(50)
+
+        assertEquals(CustomUiDestination.FULL_MENU, coordinator.getViewState().destination)
     }
 }
