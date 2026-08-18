@@ -2,6 +2,15 @@
 
 AAOS 기반 드라이브스루 주문 포트폴리오 프로젝트입니다.
 
+빠르게 볼 문서:
+- 1분 시연 스크립트 + 단계별 에뮬레이터 실행 + 스크린샷 포인트: [docs/demo-runbook.md](docs/demo-runbook.md)
+- 검증 기준 / failure scenario / 혼합 센서 정책: [docs/validation-strategy.md](docs/validation-strategy.md)
+
+면접에서 가장 짧게 보여줄 핵심:
+1. `GPS approach -> PARK -> GPS ready -> FULL_MENU`
+2. `주문 중 DRIVE -> STOP_STATE`
+3. `고속 또는 EXIT -> STANDBY 복귀`
+
 현재 상태:
 - 기획 문서 작성 완료
 - Android Automotive 에뮬레이터 및 `showcase.automotive` 샘플 실행 확인
@@ -10,9 +19,12 @@ AAOS 기반 드라이브스루 주문 포트폴리오 프로젝트입니다.
 - Step 2~5 범위의 상태 모델, 메뉴 분기, 주문 초안, ADB 스크립트 골격 구현 완료
 
 문서:
+- 면접/시연용 단일 실행 가이드: [docs/demo-runbook.md](docs/demo-runbook.md)
 - 프로젝트 기획: [docs/project-plan.md](docs/project-plan.md)
 - 현재 권장 구조 및 구현 순서: [docs/architecture.md](docs/architecture.md)
 - Step 2~6 구현 명세: [docs/implementation-spec-step2-6.md](docs/implementation-spec-step2-6.md)
+- 검증 전략 / 실패 시나리오 / 혼합 센서 정책: [docs/validation-strategy.md](docs/validation-strategy.md)
+- logging / diagnostics / error handling 정책: [docs/logging-error-handling-policy.md](docs/logging-error-handling-policy.md)
 - Voice AI 확장 기획: [docs/voice-ai-integration-plan.md](docs/voice-ai-integration-plan.md)
 - ADB 실행 스크립트 안내: [tools/adb/README.md](tools/adb/README.md)
 

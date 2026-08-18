@@ -31,6 +31,8 @@ car/drivethru/
   docs/
     project-plan.md
     architecture.md
+    validation-strategy.md
+    logging-error-handling-policy.md
     architecture/
       shell-to-vhal-command-flow.md
     references/
@@ -55,6 +57,10 @@ car/drivethru/
 ```
 
 추가 문서 경로:
+- `docs/validation-strategy.md`
+  - 검증 레벨, failure matrix, mixed sensor conflict 정책, ISO 26262-inspired checklist
+- `docs/logging-error-handling-policy.md`
+  - diagnostics, structured logging, fallback / degrade / abort 정책
 - `docs/references/`
   - VHAL, CarService, CAN, Mock 서버, 시뮬레이션 데이터 소스 정리
 - `docs/architecture/`
