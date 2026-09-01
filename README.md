@@ -17,6 +17,7 @@ AAOS 기반 드라이브스루 주문 포트폴리오 프로젝트입니다.
 - `drivethru` 초기 커밋 완료
 - 루트 Gradle 프로젝트 기준 `app.automotive` 빌드/설치/실행 확인
 - Step 2~5 범위의 상태 모델, 메뉴 분기, 주문 초안, ADB 스크립트 골격 구현 완료
+- 비콘/지오펜스 매장 진입 시 메뉴 데이터를 Room DB(SSOT)로 로컬 우선 캐싱하고, 서버 동기화는 suspend + IO 디스패처로 백그라운드에서 처리하도록 전환 완료 ([docs/architecture.md](docs/architecture.md) 참고)
 
 문서:
 - 면접/시연용 단일 실행 가이드: [docs/demo-runbook.md](docs/demo-runbook.md)
@@ -39,7 +40,7 @@ AAOS 기반 드라이브스루 주문 포트폴리오 프로젝트입니다.
 - `FakeGearStateDataSource` 기반 `DRIVE` / `PARK` 상태 전환
 - 비PARK 상태 `SimplifiedMenu`
 - `PARK` 상태 `FullMenu`
-- `FakeMenuRepository` 기반 정적 메뉴 공급
+- 매장 진입 시 Room에 캐시된 메뉴를 즉시 노출하고, 서버(`TenantCatalogRepository`) 응답이 오면 Room을 갱신해 화면에 자동 반영 (오프라인/네트워크 지연 시에도 최근 방문 메뉴로 폴백, 캐시가 없으면 `FakeMenuRepository`로 폴백)
 - 메뉴 선택 후 `OrderReviewScreen` 진입
 
 실행 방법:

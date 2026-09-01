@@ -9,6 +9,7 @@ data class CustomUiViewState(
     val stopStateReason: StopStateReason?,
     val statusMessage: String,
     val firebaseStatus: String,
+    val menuItems: List<MenuItem> = emptyList(),
 ) {
     val canResumeSession: Boolean
         get() = orderDraft != null && orderDraft.items.isNotEmpty()

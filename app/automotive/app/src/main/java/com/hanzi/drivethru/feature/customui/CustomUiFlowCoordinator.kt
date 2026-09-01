@@ -6,11 +6,11 @@ import com.hanzi.drivethru.core.model.DriveThruLanePoint
 import com.hanzi.drivethru.core.model.DriveThruZoneStage
 import com.hanzi.drivethru.core.model.EntryTriggerEvent
 import com.hanzi.drivethru.core.model.GearState
+import com.hanzi.drivethru.core.model.MenuItem
 import com.hanzi.drivethru.core.state.DriveThruSafetyPolicy
 import com.hanzi.drivethru.core.state.OrderingSessionController
 import com.hanzi.drivethru.core.state.StopStatePolicy
 import com.hanzi.drivethru.data.entry.EntryTriggerProvider
-import com.hanzi.drivethru.data.menu.MenuRepository
 import com.hanzi.drivethru.data.menu.StoreScopedMenuRepository
 import com.hanzi.drivethru.data.store.StoreResolver
 import com.hanzi.drivethru.data.vehicle.VehicleSignalProvider
@@ -24,7 +24,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 class CustomUiFlowCoordinator(
-    private val menuRepository: MenuRepository,
+    private val menuRepository: StoreScopedMenuRepository,
     private val vehicleSignalProvider: VehicleSignalProvider,
     private val entryTriggerProvider: EntryTriggerProvider,
     private val storeResolver: StoreResolver,
@@ -35,6 +35,7 @@ class CustomUiFlowCoordinator(
     private val scope = CoroutineScope(Dispatchers.Default)
     private var lastSafeOrderingDestination: CustomUiDestination = CustomUiDestination.FULL_MENU
     private var entryEventJob: Job? = null
+    private var menuObservationJob: Job? = null
 
     private var viewState: CustomUiViewState = CustomUiViewState(
         destination = CustomUiDestination.STANDBY,
@@ -50,7 +51,6 @@ class CustomUiFlowCoordinator(
 
     fun getViewState(): CustomUiViewState = viewState
     val viewStateFlow: StateFlow<CustomUiViewState> = mutableViewStateFlow.asStateFlow()
-    fun getMenuItems() = menuRepository.getAllMenuItems()
     fun getCarSignalReadings() = vehicleSignalProvider.getDiagnostics()
 
     init {
@@ -115,7 +115,13 @@ class CustomUiFlowCoordinator(
 
     private fun activateStore(entryTriggerEvent: EntryTriggerEvent) {
         val store = storeResolver.resolveStore(entryTriggerEvent) ?: return
-        (menuRepository as? StoreScopedMenuRepository)?.activateStore(store.id)
+
+        // Beacon/GPS confirms the store -> the repository immediately serves whatever Room has
+        // already cached from a previous visit, while a server refresh runs in the background
+        // and lands through the same Room-backed flow below.
+        menuRepository.activateStore(store.id)
+        observeMenuForStore(store.id)
+
         orderingSessionController.startSession(store)
         publishViewState(
             viewState.copy(
@@ -129,6 +135,20 @@ class CustomUiFlowCoordinator(
             ),
         )
         syncVehicleSignal()
+    }
+
+    private fun observeMenuForStore(storeId: String) {
+        menuObservationJob?.cancel()
+        menuObservationJob = scope.launch {
+            menuRepository.observeMenuItems(storeId).collectLatest { items: List<MenuItem> ->
+                publishViewState(
+                    viewState.copy(
+                        menuItems = items,
+                        firebaseStatus = resolveFirebaseStatus(),
+                    ),
+                )
+            }
+        }
     }
 
     fun setGearState(gearState: GearState) {
@@ -305,13 +325,7 @@ class CustomUiFlowCoordinator(
         )
     }
 
-    private fun resolveFirebaseStatus(): String {
-        return if (menuRepository is StoreScopedMenuRepository) {
-            menuRepository.getSyncStatus()
-        } else {
-            "Menu repository status unavailable."
-        }
-    }
+    private fun resolveFirebaseStatus(): String = menuRepository.getSyncStatus()
 
     private fun observeEntryEvents() {
         entryEventJob?.cancel()

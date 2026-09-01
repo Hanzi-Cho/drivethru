@@ -9,6 +9,8 @@ import com.hanzi.drivethru.core.model.MenuOptionChoice
 import com.hanzi.drivethru.core.model.MenuOptionGroup
 import com.hanzi.drivethru.core.model.Store
 import com.hanzi.drivethru.core.model.StoreCapability
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
@@ -24,7 +26,6 @@ class TenantCatalogRepository(
         parseResolverIndex(readAsset("tenants/resolver-map.json"))
     }
     private val storeConfigCache = mutableMapOf<String, TenantStoreConfig>()
-    private val menuCatalogCache = mutableMapOf<String, TenantMenuCatalog>()
 
     fun resolveStore(entryTriggerEvent: EntryTriggerEvent): Store? {
         if (entryTriggerEvent.stage == DriveThruZoneStage.OUTSIDE || entryTriggerEvent.stage == DriveThruZoneStage.EXIT) {
@@ -64,16 +65,18 @@ class TenantCatalogRepository(
         }
     }
 
-    fun loadMenuCatalog(storeId: String): TenantMenuCatalog {
-        return menuCatalogCache.getOrPut(storeId) {
-            val storeConfig = loadStoreConfig(storeId)
-            loadCatalog(storeConfig)
-        }
+    /**
+     * Suspends for the duration of the fetch; the network branch runs on [Dispatchers.IO] so
+     * callers never block their own thread (in particular, never the main thread).
+     */
+    suspend fun loadMenuCatalog(storeId: String): TenantMenuCatalog {
+        val storeConfig = loadStoreConfig(storeId)
+        return loadCatalog(storeConfig)
     }
 
     fun getStatus(): String = status.get()
 
-    private fun loadCatalog(storeConfig: TenantStoreConfig): TenantMenuCatalog {
+    private suspend fun loadCatalog(storeConfig: TenantStoreConfig): TenantMenuCatalog {
         val localOptionGroups = storeConfig.localOrderOptionsAssetPath?.let { assetPath ->
             runCatching {
                 parseOptionGroupMap(readAsset(assetPath))
@@ -92,22 +95,24 @@ class TenantCatalogRepository(
         }
     }
 
-    private fun loadRemoteCatalog(storeConfig: TenantStoreConfig): TenantMenuCatalog? {
+    private suspend fun loadRemoteCatalog(storeConfig: TenantStoreConfig): TenantMenuCatalog? {
         val url = storeConfig.remoteMenuUrl ?: return null
-        return runCatching {
-            val connection = URL(url).openConnection() as HttpURLConnection
-            connection.connectTimeout = 1200
-            connection.readTimeout = 1200
-            connection.requestMethod = "GET"
-            connection.inputStream.bufferedReader().use { reader ->
-                val body = reader.readText()
-                parseMenuCatalog(body, emptyMap()).also {
-                    status.set("Remote tenant menu loaded for ${storeConfig.storeId}.")
+        return withContext(Dispatchers.IO) {
+            runCatching {
+                val connection = URL(url).openConnection() as HttpURLConnection
+                connection.connectTimeout = 1200
+                connection.readTimeout = 1200
+                connection.requestMethod = "GET"
+                connection.inputStream.bufferedReader().use { reader ->
+                    val body = reader.readText()
+                    parseMenuCatalog(body, emptyMap()).also {
+                        status.set("Remote tenant menu loaded for ${storeConfig.storeId}.")
+                    }
                 }
+            }.getOrElse {
+                status.set("Remote menu load failed for ${storeConfig.storeId}; using local fallback if available.")
+                null
             }
-        }.getOrElse {
-            status.set("Remote menu load failed for ${storeConfig.storeId}; using local fallback if available.")
-            null
         }
     }
 

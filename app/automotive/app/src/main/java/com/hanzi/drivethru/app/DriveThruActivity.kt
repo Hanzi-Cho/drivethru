@@ -127,7 +127,7 @@ private fun DriveThruCustomUiApp(
     val viewState by coordinator.viewStateFlow.collectAsState()
     var uiMode by remember { mutableStateOf(DriveThruUiMode.ENHANCED_CUSTOM) }
 
-    val menuItems = coordinator.getMenuItems()
+    val menuItems = viewState.menuItems
     val diagnostics = coordinator.getCarSignalReadings()
 
     Box(
